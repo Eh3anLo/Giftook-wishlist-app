@@ -104,7 +104,16 @@ model GiftItem {
 model Reservation {
   id         String   @id @default(cuid())
   giftItemId String   @unique @map("gift_item_id")
+
   userId     String?  @map("user_id")
+  
+  guestName  String?  @map("guest_name")
+  guestEmail String?  @map("guest_email")
+  guestPhone String?  @map("guest_phone")
+  notes      String?  @db.VarChar(500)
+
+  message    String?  @db.VarChar(1000)
+
   createdAt  DateTime @default(now()) @map("created_at")
   giftItem   GiftItem @relation(fields: [giftItemId], references: [id], onDelete: Cascade)
   user       User?    @relation(fields: [userId], references: [id])

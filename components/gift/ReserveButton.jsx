@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState , useEffect} from "react"
 
 /**
  * ReserveButton — Client Component.
@@ -12,12 +12,21 @@ import { useState } from 'react'
  *  - isReserved (bool): whether the item is already reserved by anyone
  *  - isOwnReservation (bool): whether the current user is the one who reserved it
  */
-export default function ReserveButton({ giftItemId, reservationId, isReserved: initialReserved, isOwnReservation: initialIsOwn }) {
+export default function ReserveButton({
+  giftItemId,
+  reservationId,
+  isReserved: initialReserved,
+  isOwnReservation: initialIsOwn,
+}) {
   const [isReserved, setIsReserved] = useState(initialReserved)
   const [isOwnReservation, setIsOwnReservation] = useState(initialIsOwn)
-  const [currentReservationId, setCurrentReservationId] = useState(reservationId)
+  const [currentReservationId, setCurrentReservationId] =
+    useState(reservationId)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState("")
+
+  const [showDialog, setShowDialog] = useState(false)
+  const [message, setMessage] = useState("")
 
   // Item reserved by someone else — show static disabled badge, no action
   if (isReserved && !isOwnReservation) {
@@ -31,51 +40,67 @@ export default function ReserveButton({ giftItemId, reservationId, isReserved: i
     )
   }
 
-  async function handleReserve() {
-    setError('')
-    // Optimistic update — update UI before awaiting the response
+  function handleReserve() {
+    setError("")
+    setShowDialog(true)
+  }
+
+  async function submitReservation() {
+    setError("")
+
     setIsReserved(true)
     setIsOwnReservation(true)
     setLoading(true)
+
     try {
-      const res = await fetch('/api/reservations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ giftItemId }),
+      const res = await fetch("/api/reservations", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          giftItemId,
+          message,
+        }),
       })
 
       if (res.status === 401) {
-        // Rollback optimistic update before redirecting
         setIsReserved(false)
         setIsOwnReservation(false)
-        window.location.href = '/login?callbackUrl=' + encodeURIComponent(window.location.pathname)
+
+        window.location.href =
+          "/login?callbackUrl=" + encodeURIComponent(window.location.pathname)
+
         return
       }
 
       if (res.status === 409) {
-        // Rollback — item was already reserved by someone else
         setIsReserved(false)
         setIsOwnReservation(false)
-        setError('این هدیه قبلاً رزرو شده است.')
+
+        setError("این هدیه قبلاً رزرو شده است.")
         return
       }
 
       if (!res.ok) {
-        // Rollback optimistic update on any other error
         setIsReserved(false)
         setIsOwnReservation(false)
+
         const data = await res.json().catch(() => ({}))
-        setError(data.error ?? 'خطایی رخ داده است.')
+        setError(data.error ?? "خطایی رخ داده است.")
         return
       }
 
       const data = await res.json()
+
       setCurrentReservationId(data.id)
+      setShowDialog(false)
+      setMessage("")
     } catch {
-      // Network error — rollback
       setIsReserved(false)
       setIsOwnReservation(false)
-      setError('خطا در ارتباط با سرور.')
+
+      setError("خطا در ارتباط با سرور.")
     } finally {
       setLoading(false)
     }
@@ -83,21 +108,22 @@ export default function ReserveButton({ giftItemId, reservationId, isReserved: i
 
   async function handleCancelReservation() {
     if (!currentReservationId) return
-    setError('')
+    setError("")
     // Optimistic update — update UI before awaiting the response
     setIsReserved(false)
     setIsOwnReservation(false)
     setLoading(true)
     try {
       const res = await fetch(`/api/reservations/${currentReservationId}`, {
-        method: 'DELETE',
+        method: "DELETE",
       })
 
       if (res.status === 401) {
         // Rollback optimistic update before redirecting
         setIsReserved(true)
         setIsOwnReservation(true)
-        window.location.href = '/login?callbackUrl=' + encodeURIComponent(window.location.pathname)
+        window.location.href =
+          "/login?callbackUrl=" + encodeURIComponent(window.location.pathname)
         return
       }
 
@@ -106,20 +132,39 @@ export default function ReserveButton({ giftItemId, reservationId, isReserved: i
         setIsReserved(true)
         setIsOwnReservation(true)
         const data = await res.json().catch(() => ({}))
-        setError(data.error ?? 'خطا در لغو رزرو.')
+        setError(data.error ?? "خطا در لغو رزرو.")
         return
       }
 
       setCurrentReservationId(null)
+      setMessage("")
+      setShowDialog(false)
+      setError("")
     } catch {
       // Network error — rollback
       setIsReserved(true)
       setIsOwnReservation(true)
-      setError('خطا در ارتباط با سرور.')
+      setError("خطا در ارتباط با سرور.")
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!showDialog) return
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        setShowDialog(false)
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", onKeyDown)
+    }
+  }, [showDialog])
 
   return (
     <div className="flex flex-col items-end gap-1">
@@ -128,24 +173,60 @@ export default function ReserveButton({ giftItemId, reservationId, isReserved: i
           type="button"
           onClick={handleCancelReservation}
           disabled={loading}
-          className="rounded-md border border-destructive px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 disabled:opacity-60"
+          className="rounded-md border border-destructive px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:outline-none disabled:opacity-60"
         >
-          {loading ? 'در حال لغو...' : 'لغو رزرو'}
+          {loading ? "در حال لغو..." : "لغو رزرو"}
         </button>
       ) : (
         <button
           type="button"
           onClick={handleReserve}
           disabled={loading}
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-60"
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-60"
         >
-          {loading ? 'در حال رزرو...' : 'رزرو کن'}
+          {loading ? "در حال رزرو..." : "رزرو کن"}
         </button>
       )}
       {error && (
         <p role="alert" className="text-xs text-red-600">
           {error}
         </p>
+      )}
+      {showDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-bold">رزرو هدیه</h2>
+
+            <label className="mb-2 block text-sm">
+              پیام برای صاحب لیست (اختیاری)
+            </label>
+
+            <textarea
+              rows={4}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              className="mb-5 w-full rounded-lg border border-input p-2"
+              placeholder="مثلاً: امیدوارم دوستش داشته باشی 🌹"
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDialog(false)}
+                className="rounded-md border px-4 py-2"
+              >
+                انصراف
+              </button>
+
+              <button
+                onClick={submitReservation}
+                disabled={loading}
+                className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+              >
+                ثبت رزرو
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

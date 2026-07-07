@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import Link from  "next/link"
+import Link from "next/link"
 import GiftItemForm from "@/components/gift/GiftItemForm"
 import ReserveButton from "@/components/gift/ReserveButton"
+import OwnerReservationDialog from "@/components/gift/OwnerReservationDialog"
 import ConfirmDialog from "@/components/common/ConfirmDialog"
 import { useRouter } from "next/navigation"
 
@@ -42,6 +43,8 @@ export default function GiftItemCard({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteError, setDeleteError] = useState("")
   const [deleting, setDeleting] = useState(false)
+  const [showOwnerReservationDialog, setShowOwnerReservationDialog] =
+    useState(false)
 
   async function handleDelete() {
     setDeleteError("")
@@ -169,8 +172,7 @@ export default function GiftItemCard({
                   />
                 </div>
               )}
-              
-              
+
               {item.reserver.id ? (
                 <Link
                   href={`/u/${item.reserver.id}`}
@@ -186,6 +188,15 @@ export default function GiftItemCard({
               {/* <span className="font-medium text-foreground">
                 {item.reserver.name ?? 'کاربر ناشناس'}
               </span> */}
+            </div>
+          )}
+          {item.isReserved && item.reservation?.message && (
+            <div className="mt-2 rounded-md border border-border bg-muted/40 p-3">
+              <p className="text-xs text-muted-foreground">پیام رزرو:</p>
+
+              <p className="mt-1 text-sm whitespace-pre-wrap">
+                {item.reservation.message}
+              </p>
             </div>
           )}
 
@@ -216,6 +227,17 @@ export default function GiftItemCard({
               >
                 حذف
               </button>
+              {isOwner && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowOwnerReservationDialog(true)}
+                    className="rounded-md border border-primary bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                  >
+                    {item.isReserved ? "مدیریت رزرو" : "رزرو هدیه"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -240,6 +262,17 @@ export default function GiftItemCard({
           {deleteError}
         </p>
       )}
+      <OwnerReservationDialog
+        open={showOwnerReservationDialog}
+        onClose={() => setShowOwnerReservationDialog(false)}
+        giftItemId={item.id}
+        reservation={item.reservation ?? null}
+        showReserverIdentity={showReserverIdentity}
+        onSuccess={() => {
+          setShowOwnerReservationDialog(false)
+          router.refresh()
+        }}
+      />
 
       {/* Delete confirmation dialog */}
       <ConfirmDialog

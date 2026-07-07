@@ -1,7 +1,7 @@
-import { nanoid } from 'nanoid'
-import prisma from '@/lib/prisma.js'
-import { validateWishlist } from '@/lib/validations.js'
-import { ValidationError, ForbiddenError } from '@/lib/errors.js'
+import { nanoid } from "nanoid"
+import prisma from "@/lib/prisma.js"
+import { validateWishlist } from "@/lib/validations.js"
+import { ValidationError, ForbiddenError } from "@/lib/errors.js"
 
 // ---------------------------------------------------------------------------
 // createWishlist
@@ -18,9 +18,22 @@ import { ValidationError, ForbiddenError } from '@/lib/errors.js'
  */
 export async function createWishlist(
   userId,
-  { title, description, coverImage, occasion, visibility, showReserverIdentity } = {}
+  {
+    title,
+    description,
+    coverImage,
+    occasion,
+    visibility,
+    showReserverIdentity,
+  } = {}
 ) {
-  const validation = validateWishlist({ title, description, coverImage, occasion, visibility })
+  const validation = validateWishlist({
+    title,
+    description,
+    coverImage,
+    occasion,
+    visibility,
+  })
   if (!validation.valid) {
     throw new ValidationError(validation.error, validation.field)
   }
@@ -34,7 +47,7 @@ export async function createWishlist(
       description: description ?? null,
       coverImage: coverImage || null,
       occasion: occasion || null,
-      visibility: visibility ?? 'private',
+      visibility: visibility ?? "private",
       shareToken,
       showReserverIdentity: showReserverIdentity ?? false,
     },
@@ -53,7 +66,10 @@ export async function createWishlist(
  * @param {{ page?: number, pageSize?: number }} options
  * @returns {Promise<{ wishlists: object[], total: number }>}
  */
-export async function getWishlistsByUser(userId, { page = 1, pageSize = 10 } = {}) {
+export async function getWishlistsByUser(
+  userId,
+  { page = 1, pageSize = 10 } = {}
+) {
   const skip = (page - 1) * pageSize
 
   const [wishlists, total] = await Promise.all([
@@ -61,7 +77,7 @@ export async function getWishlistsByUser(userId, { page = 1, pageSize = 10 } = {
       where: { userId },
       skip,
       take: pageSize,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         _count: {
           select: {
@@ -118,14 +134,17 @@ export async function getWishlistById(wishlistId, requestingUserId) {
             },
           },
         },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
       },
     },
   })
 
   if (!wishlist) return null
 
-  if (wishlist.visibility === 'private' && wishlist.userId !== requestingUserId) {
+  if (
+    wishlist.visibility === "private" &&
+    wishlist.userId !== requestingUserId
+  ) {
     throw new ForbiddenError()
   }
 
@@ -135,18 +154,46 @@ export async function getWishlistById(wishlistId, requestingUserId) {
   const items = wishlist.items.map((item) => {
     const reserved = item.reservation !== null
 
-    if (revealIdentity && reserved) {
+    if (reserved) {
       return {
         ...item,
         isReserved: true,
-        reserver: item.reservation.user ?? null,
-        reservation: undefined,
+
+        reserver: revealIdentity
+          ? (item.reservation.user ?? {
+              name: item.reservation.guestName,
+              image: null,
+              id: null,
+            })
+          : null,
+
+        reservation: {
+          id: item.reservation.id,
+
+          userId: item.reservation.userId,
+
+          guestName: item.reservation.guestName,
+          guestEmail: item.reservation.guestEmail,
+          guestPhone: item.reservation.guestPhone,
+
+          message: item.reservation.message,
+
+          user: revealIdentity ? item.reservation.user : null,
+        },
       }
     }
 
     // Strip reservation details — expose only boolean flag
-    const { reservation: _res, ...rest } = item
-    return { ...rest, isReserved: reserved }
+    return {
+      ...item,
+      isReserved: reserved,
+      reservation: reserved
+        ? {
+            id: item.reservation.id,
+            message: item.reservation.message,
+          }
+        : null,
+    }
   })
 
   return { ...wishlist, items }
@@ -172,24 +219,31 @@ export async function getWishlistByShareToken(shareToken) {
         include: {
           reservation: true,
         },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
       },
-      owner:{
-        select:{
+      owner: {
+        select: {
           name: true,
-          image: true
-        }
-      }
+          image: true,
+        },
+      },
     },
   })
 
   if (!wishlist) return null
-  if (wishlist.visibility === 'private') return null
+  if (wishlist.visibility === "private") return null
 
   // Strip all reserver identity data — only expose isReserved boolean
   const items = wishlist.items.map((item) => {
-    const { reservation, ...rest } = item
-    return { ...rest, isReserved: reservation !== null }
+    return {
+      ...item,
+      isReserved: item.reservation !== null,
+      reservation: item.reservation
+        ? {
+            message: item.reservation.message,
+          }
+        : null,
+    }
   })
 
   return { ...wishlist, items }
@@ -212,9 +266,18 @@ export async function getWishlistByShareToken(shareToken) {
 export async function updateWishlist(
   wishlistId,
   userId,
-  { title, description, coverImage, occasion, visibility, showReserverIdentity } = {}
+  {
+    title,
+    description,
+    coverImage,
+    occasion,
+    visibility,
+    showReserverIdentity,
+  } = {}
 ) {
-  const existing = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
+  const existing = await prisma.wishlist.findUnique({
+    where: { id: wishlistId },
+  })
 
   if (!existing || existing.userId !== userId) {
     throw new ForbiddenError()
@@ -242,7 +305,8 @@ export async function updateWishlist(
   if (coverImage !== undefined) updateData.coverImage = coverImage || null
   if (occasion !== undefined) updateData.occasion = occasion || null
   if (visibility !== undefined) updateData.visibility = visibility
-  if (showReserverIdentity !== undefined) updateData.showReserverIdentity = showReserverIdentity
+  if (showReserverIdentity !== undefined)
+    updateData.showReserverIdentity = showReserverIdentity
 
   return prisma.wishlist.update({
     where: { id: wishlistId },
@@ -263,7 +327,9 @@ export async function updateWishlist(
  * @returns {Promise<void>}
  */
 export async function deleteWishlist(wishlistId, userId) {
-  const existing = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
+  const existing = await prisma.wishlist.findUnique({
+    where: { id: wishlistId },
+  })
 
   if (!existing || existing.userId !== userId) {
     throw new ForbiddenError()
