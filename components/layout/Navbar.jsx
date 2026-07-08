@@ -1,3 +1,4 @@
+import  Link  from "next/link"
 import SignOutButton from "@/components/layout/SignOutButton"
 
 /**
@@ -17,7 +18,7 @@ export default function Navbar({ session }) {
         {user && (
           <div className="flex items-center gap-2">
             {/* Avatar */}
-            <div className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary text-primary-foreground text-sm font-medium">
+            <div className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-medium text-primary-foreground">
               {user.image ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -38,9 +39,12 @@ export default function Navbar({ session }) {
       </div>
 
       {/* Right side (RTL) — brand logo */}
-      <div className="flex items-center gap-2">
+      <Link
+        href="/dashboard"
+        className="flex items-center gap-2 transition-opacity hover:opacity-80"
+      >
         <span className="text-lg font-bold text-primary">گیفتوک</span>
-      </div>
+      </Link>
     </header>
   )
 }
