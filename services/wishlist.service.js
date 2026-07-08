@@ -157,6 +157,7 @@ export async function getWishlistById(wishlistId, requestingUserId) {
     if (reserved) {
       return {
         ...item,
+        price: item.price?.toString() ?? null,
         isReserved: true,
 
         reserver: revealIdentity

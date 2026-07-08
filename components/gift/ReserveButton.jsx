@@ -173,7 +173,7 @@ export default function ReserveButton({
           type="button"
           onClick={handleCancelReservation}
           disabled={loading}
-          className="rounded-md border border-destructive px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:outline-none disabled:opacity-60"
+          className="w-full rounded-md border border-destructive px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:outline-none disabled:opacity-60"
         >
           {loading ? "در حال لغو..." : "لغو رزرو"}
         </button>
@@ -182,7 +182,7 @@ export default function ReserveButton({
           type="button"
           onClick={handleReserve}
           disabled={loading}
-          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-60"
+          className="w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none disabled:opacity-60"
         >
           {loading ? "در حال رزرو..." : "رزرو کن"}
         </button>

@@ -87,10 +87,11 @@ export default function GiftItemCard({
 
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         {/* Thumbnail */}
         {item.imageUrl && (
-          <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-muted">
+          <div className="mx-auto h-20 w-20 overflow-hidden rounded-lg bg-muted sm:mx-0 sm:h-16 sm:w-16 sm:flex-shrink-0">
+            {" "}
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={item.imageUrl}
@@ -103,9 +104,8 @@ export default function GiftItemCard({
         {/* Main content */}
         <div className="min-w-0 flex-1">
           {/* Title row + badges */}
-          <div className="mb-1 flex flex-wrap items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
             <span className="font-medium text-foreground">{item.title}</span>
-
             {/* Reservation status badge — Requirement 10.3 */}
             {item.isReserved ? (
               <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
@@ -116,7 +116,6 @@ export default function GiftItemCard({
                 رزرو نشده
               </span>
             )}
-
             {/* Priority badge */}
             {item.priority && (
               <span
@@ -131,13 +130,13 @@ export default function GiftItemCard({
 
           {/* Description */}
           {item.description && (
-            <p className="mb-1 line-clamp-2 text-sm text-muted-foreground">
+            <p className="mb-2 pt-1 line-clamp-2 text-sm text-muted-foreground flex flex-wrap items-center justify-center sm:justify-start">
               {item.description}
             </p>
           )}
 
           {/* Price + link */}
-          <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground sm:justify-start">
             {item.price != null && (
               <span>
                 قیمت:{" "}
@@ -160,7 +159,7 @@ export default function GiftItemCard({
 
           {/* Reserver identity — only for owner with showReserverIdentity: true (Requirement 9.11) */}
           {isOwner && showReserverIdentity && item.reserver && (
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-xs text-muted-foreground sm:justify-start">
               <span>رزرو توسط:</span>
               {item.reserver.image && (
                 <div className="h-5 w-5 overflow-hidden rounded-full bg-muted">
@@ -209,30 +208,30 @@ export default function GiftItemCard({
         </div>
 
         {/* Actions column */}
-        <div className="flex flex-shrink-0 flex-col items-end gap-2">
+        <div className="flex flex-col gap-2 sm:items-end">
           {/* Owner controls: edit + delete */}
           {isOwner && (
-            <div className="flex gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="rounded-md border border-input bg-background px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+                className="w-full rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted sm:w-auto sm:px-2.5 sm:py-1 sm:text-xs"
               >
                 ویرایش
               </button>
               <button
                 type="button"
                 onClick={() => setShowDeleteDialog(true)}
-                className="rounded-md border border-destructive/50 bg-background px-2.5 py-1 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:outline-none"
+                className="w-full rounded-md border border-destructive/50 bg-background px-4 py-2 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 sm:w-auto sm:px-2.5 sm:py-1 sm:text-xs"
               >
                 حذف
               </button>
               {isOwner && (
-                <div className="flex gap-2">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                   <button
                     type="button"
                     onClick={() => setShowOwnerReservationDialog(true)}
-                    className="rounded-md border border-primary bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                    className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:px-3 sm:py-1.5 sm:text-xs"
                   >
                     {item.isReserved ? "مدیریت رزرو" : "رزرو هدیه"}
                   </button>
@@ -240,7 +239,6 @@ export default function GiftItemCard({
               )}
             </div>
           )}
-
           {/* Reserve button — shown to authenticated non-owner visitors.
               Also shown when the item is reserved by the current user so they can cancel. */}
           {!isOwner && currentUserId && (

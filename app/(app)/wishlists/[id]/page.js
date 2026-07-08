@@ -1,10 +1,14 @@
-import { notFound } from 'next/navigation'
-import Link from 'next/link'
-import { auth } from '@/lib/auth.js'
-import { getWishlistById, getWishlistProgress } from '@/services/wishlist.service.js'
-import ShareButton from '@/components/wishlist/ShareButton'
-import WishlistDeleteButton from '@/components/wishlist/WishlistDeleteButton'
-import GiftItemsSection from '@/components/gift/GiftItemsSection'
+import { notFound } from "next/navigation"
+import Link from "next/link"
+import { auth } from "@/lib/auth.js"
+import {
+  getWishlistById,
+  getWishlistProgress,
+} from "@/services/wishlist.service.js"
+import ShareButton from "@/components/wishlist/ShareButton"
+import WishlistDeleteButton from "@/components/wishlist/WishlistDeleteButton"
+import GiftItemsSection from "@/components/gift/GiftItemsSection"
+import CelebrationEffect from "@/components/common/CelebrationEffect"
 
 /**
  * WishlistDetailPage — Server Component.
@@ -15,23 +19,25 @@ import GiftItemsSection from '@/components/gift/GiftItemsSection'
  */
 
 const OCCASION_LABELS = {
-  birthday: 'تولد',
-  wedding: 'عروسی',
-  holiday: 'تعطیلات',
-  other: 'سایر',
+  birthday: "تولد",
+  wedding: "عروسی",
+  holiday: "تعطیلات",
+  other: "سایر",
 }
 
 const VISIBILITY_LABELS = {
-  public: 'عمومی',
-  private: 'خصوصی',
-  link_only: 'فقط با لینک',
+  public: "عمومی",
+  private: "خصوصی",
+  link_only: "فقط با لینک",
 }
 
 export async function generateMetadata({ params }) {
   const { id } = await params
   const session = await auth()
-  const wishlist = await getWishlistById(id, session?.user?.id ?? null).catch(() => null)
-  return { title: wishlist?.title ?? 'لیست آرزو' }
+  const wishlist = await getWishlistById(id, session?.user?.id ?? null).catch(
+    () => null
+  )
+  return { title: wishlist?.title ?? "لیست آرزو" }
 }
 
 export default async function WishlistDetailPage({ params }) {
@@ -88,7 +94,9 @@ export default async function WishlistDetailPage({ params }) {
 
         {/* Title + badges */}
         <div className="mb-2 flex flex-wrap items-start gap-2">
-          <h1 className="flex-1 text-2xl font-bold text-foreground">{wishlist.title}</h1>
+          <h1 className="flex-1 text-2xl font-bold text-foreground">
+            {wishlist.title}
+          </h1>
           <div className="flex flex-wrap gap-1.5">
             {wishlist.occasion && (
               <span className="rounded-full bg-pink-100 px-2.5 py-0.5 text-xs font-medium text-pink-800">
@@ -103,13 +111,19 @@ export default async function WishlistDetailPage({ params }) {
 
         {/* Description */}
         {wishlist.description && (
-          <p className="mb-4 text-sm text-muted-foreground">{wishlist.description}</p>
+          <p className="mb-4 text-sm text-muted-foreground">
+            {wishlist.description}
+          </p>
         )}
 
         {/* Progress */}
         <div className="mb-4 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{progress.reserved}</span> از{' '}
-          <span className="font-medium text-foreground">{progress.total}</span> آیتم رزرو شده
+          <span className="font-medium text-foreground">
+            {progress.reserved}
+          </span>{" "}
+          از{" "}
+          <span className="font-medium text-foreground">{progress.total}</span>{" "}
+          آیتم رزرو شده
         </div>
 
         {/* Owner controls */}
@@ -121,7 +135,7 @@ export default async function WishlistDetailPage({ params }) {
             {/* Edit link */}
             <Link
               href={`/wishlists/${wishlist.id}/edit`}
-              className="inline-flex items-center rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              className="inline-flex items-center rounded-md border border-input bg-background px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
             >
               ویرایش
             </Link>
@@ -143,6 +157,7 @@ export default async function WishlistDetailPage({ params }) {
         showReserverIdentity={wishlist.showReserverIdentity}
         currentUserId={userId}
       />
+      <CelebrationEffect active={isOwner && wishlist.showReserverIdentity && allReserved} />
     </div>
   )
 }
