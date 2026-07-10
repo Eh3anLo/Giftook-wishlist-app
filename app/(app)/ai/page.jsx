@@ -1,74 +1,76 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-
-import ChatLayout from "@/components/ai/ChatLayout";
-import ChatMessages from "@/components/ai/ChatMessages";
-import ChatInput from "@/components/ai/PromptInput";
+import { useState } from "react"
+import { generateGiftIdeas } from "@/services/ai.service"
+import PromptInput from "@/components/ai/PromptInput"
+import RecommendationList from "@/components/ai/RecommendationList"
+import ProfileSummary from "@/components/ai/ProfileSummary"
+import ChatWindow from "@/components/ai/ChatWindow"
+import { sendChat } from "@/services/ai.service"
+import { MESSAGE_TYPES } from "@/lib/chat-message"
 
 export default function AIPage() {
-  const [messages, setMessages] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [messages, setMessages] = useState([
+    {
+      id: crypto.randomUUID(),
+      role: "assistant",
+      type: MESSAGE_TYPES.TEXT,
+      content:
+        "سلام 👋 من دستیار پیشنهاد هدیه هستم. هر اطلاعاتی درباره شخص موردنظر داری برام بنویس.",
+    },
+  ])
 
-  async function sendMessage(text) {
-    const updatedMessages = [
-      ...messages,
-      {
-        role: "user",
-        content: text,
-      },
-    ];
+  const [input, setInput] = useState("")
+  const [loading, setLoading] = useState(false)
+  async function handleSend() {
+    if (!input.trim()) return
 
-    setMessages(updatedMessages);
-    setLoading(true);
+    const userMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      type: MESSAGE_TYPES.TEXT,
+      content: input,
+    }
+    const updatedMessages = [...messages, userMessage]
+
+    setMessages(updatedMessages)
+
+    setInput("")
 
     try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: updatedMessages,
-        }),
-      });
+      setLoading(true)
 
-      if (!res.ok) {
-        throw new Error("Request failed");
-      }
+      const assistantMessage = await sendChat(updatedMessages)
 
-      const data = await res.json();
-
-      setMessages([
-        ...updatedMessages,
-        {
-          role: "assistant",
-          content: data.message,
-        },
-      ]);
+      setMessages((prev) => [...prev, assistantMessage])
     } catch (error) {
-      console.error(error);
-
-      setMessages([
-        ...updatedMessages,
-        {
-          role: "assistant",
-          content: "خطایی در ارتباط با هوش مصنوعی رخ داد.",
-        },
-      ]);
+      console.error(error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
   }
 
-  return (
-    <ChatLayout>
-      <ChatMessages
-        messages={messages}
-        loading={loading}
-      />
+  // async function handleGenerate() {
+  //   try {
+  //     setLoading(true)
+  //     console.log("hello")
+  //     const data = await generateGiftIdeas(prompt)
 
-      <ChatInput onSend={sendMessage} />
-    </ChatLayout>
-  );
+  //     setResult(data)
+  //   } catch (error) {
+  //     console.error(error)
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
+
+  return (
+    <ChatWindow
+      messages={messages}
+      input={input}
+      setInput={setInput}
+      onSend={handleSend}
+      loading={loading}
+    />
+  )
 }
