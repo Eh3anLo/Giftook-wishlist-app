@@ -156,14 +156,15 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="mb-1 block text-sm text-foreground">
-                      بودجه (دلار)
+                      بودجه (تومان)
                     </label>
                     <input
                       type="number"
-                      min="1"
+                      min="1000"
+                      step="1000"
                       value={budget}
                       onChange={(e) => setBudget(e.target.value)}
-                      placeholder="اختیاری"
+                      placeholder="مثلاً ۱۵۰۰۰۰۰"
                       className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
                     />
                   </div>
@@ -221,8 +222,14 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                             )}
                             {(s.estimatedMinPrice || s.estimatedMaxPrice) && (
                               <span>
-                                ${s.estimatedMinPrice ?? "?"} - $
-                                {s.estimatedMaxPrice ?? "?"}
+                                {s.estimatedMinPrice != null
+                                  ? s.estimatedMinPrice.toLocaleString("fa-IR")
+                                  : "؟"}
+                                {" تا "}
+                                {s.estimatedMaxPrice != null
+                                  ? s.estimatedMaxPrice.toLocaleString("fa-IR")
+                                  : "؟"}
+                                {" تومان"}
                               </span>
                             )}
                             <a
