@@ -42,7 +42,7 @@ export async function POST(req, { params }) {
       return Response.json({ error: 'درخواست نامعتبر است.' }, { status: 400 })
     }
 
-    const { title, description, price, url, imageUrl, priority, notes } = body ?? {}
+    const { title, description, price, url, imageUrl, priority, notes, source } = body ?? {}
 
     const item = await addGiftItem(id, session.user.id, {
       title,
@@ -52,6 +52,7 @@ export async function POST(req, { params }) {
       imageUrl,
       priority,
       notes,
+      source,
     })
 
     const responseBody = {
@@ -64,6 +65,7 @@ export async function POST(req, { params }) {
       imageUrl: item.imageUrl,
       priority: item.priority,
       notes: item.notes,
+      source: item.source,
       isReserved: false,
       createdAt: item.createdAt,
     }

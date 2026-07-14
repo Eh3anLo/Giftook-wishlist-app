@@ -92,6 +92,7 @@ model GiftItem {
   imageUrl    String?      @map("image_url")
   priority    Priority?
   notes       String?      @db.VarChar(500)
+  source      GiftItemSource @default(manual)
   createdAt   DateTime     @default(now()) @map("created_at")
   updatedAt   DateTime     @updatedAt @map("updated_at")
   wishlist    Wishlist     @relation(fields: [wishlistId], references: [id], onDelete: Cascade)
@@ -122,6 +123,8 @@ model Reservation {
   @@map("reservations")
 }
 
+
+
 enum Visibility {
   public
   private
@@ -139,4 +142,9 @@ enum Priority {
   low
   medium
   high
+}
+
+enum GiftItemSource {
+  manual
+  genie
 }

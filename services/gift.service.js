@@ -2,6 +2,8 @@ import prisma from '@/lib/prisma.js'
 import { validateGiftItem } from '@/lib/validations.js'
 import { ValidationError, ForbiddenError, NotFoundError } from '@/lib/errors.js'
 
+const ALLOWED_SOURCES = ['manual', 'genie']
+
 // ---------------------------------------------------------------------------
 // addGiftItem
 // ---------------------------------------------------------------------------
@@ -13,7 +15,8 @@ import { ValidationError, ForbiddenError, NotFoundError } from '@/lib/errors.js'
  * @param {string} wishlistId
  * @param {string} userId  Must be the wishlist owner
  * @param {{ title: string, description?: string, price?: number,
- *           url?: string, imageUrl?: string, priority?: string, notes?: string }} data
+ *           url?: string, imageUrl?: string, priority?: string, notes?: string,
+ *           source?: 'manual'|'genie' }} data
  * @returns {Promise<object>} Created GiftItem record
  */
 export async function addGiftItem(wishlistId, userId, data) {
@@ -28,7 +31,7 @@ export async function addGiftItem(wishlistId, userId, data) {
     throw new ValidationError(validation.error, validation.field)
   }
 
-  const { title, description, price, url, imageUrl, priority, notes } = data
+  const { title, description, price, url, imageUrl, priority, notes, source } = data
 
   return prisma.giftItem.create({
     data: {
@@ -40,6 +43,7 @@ export async function addGiftItem(wishlistId, userId, data) {
       imageUrl: imageUrl || null,
       priority: priority || null,
       notes: notes ?? null,
+      source: ALLOWED_SOURCES.includes(source) ? source : 'manual',
     },
   })
 }

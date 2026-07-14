@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import GiftItemCard from '@/components/gift/GiftItemCard'
-import GiftItemForm from '@/components/gift/GiftItemForm'
+import { useState } from "react"
+import { useRouter } from "next/navigation"
+import GiftItemCard from "@/components/gift/GiftItemCard"
+import GiftItemForm from "@/components/gift/GiftItemForm"
+import GenieDialog from "./GenieDialog.jsx"
 
 /**
  * GiftItemsSection — Client Component.
@@ -39,13 +40,19 @@ export default function GiftItemsSection({
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-lg font-semibold text-foreground">آیتم‌های لیست</h2>
         {isOwner && !showAddForm && (
-          <button
-            type="button"
-            onClick={() => setShowAddForm(true)}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-          >
-            افزودن هدیه
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button
+              type="button"
+              onClick={() => setShowAddForm(true)}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none"
+            >
+              افزودن هدیه
+            </button>
+            <GenieDialog
+              wishlistId={wishlistId}
+              onItemAdded={() => handleAddSuccess()}
+            />
+          </div>
         )}
       </div>
 
