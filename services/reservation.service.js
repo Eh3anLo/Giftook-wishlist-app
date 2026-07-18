@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma.js"
-import { ForbiddenError, ConflictError, NotFoundError } from "@/lib/errors.js"
+import { ForbiddenError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors.js"
+import { notifyReservationCreated } from "@/services/notification.service.js"
 
 // ---------------------------------------------------------------------------
 // createReservation
@@ -24,11 +25,17 @@ export async function createReservation(
   userId,
   { guestName, guestEmail, guestPhone, message } = {}
 ) {
-  // 1. Fetch gift item and its parent wishlist
+  // 1. Fetch gift item and its parent wishlist (including owner email for notification)
   const giftItem = await prisma.giftItem.findUnique({
     where: { id: giftItemId },
     include: {
-      wishlist: true,
+      wishlist: {
+        include: {
+          owner: {
+            select: { email: true },
+          },
+        },
+      },
       reservation: true,
     },
   })
@@ -71,9 +78,18 @@ export async function createReservation(
     },
   })
 
+  // 6. Notify the wishlist owner (best-effort — never blocks the response)
+  await notifyReservationCreated({
+    ownerEmail: giftItem.wishlist.owner?.email ?? null,
+    showReserverIdentity: giftItem.wishlist.showReserverIdentity,
+    wishlistTitle: giftItem.wishlist.title,
+    wishlistShareToken: giftItem.wishlist.shareToken,
+    itemTitle: giftItem.title,
+    reservation: { userId, guestName },
+  })
+
   return reservation
 }
-
 // ---------------------------------------------------------------------------
 // cancelReservation
 // ---------------------------------------------------------------------------
@@ -357,7 +373,7 @@ export async function ownerReserveGift(
   // Validation when reserving for another person
   if (!reserveForSelf) {
     if (!guestName || guestName.trim() === "") {
-      throw new ValidationError("نام شخص رزروکننده الزامی است.", "ناقص")
+      throw new ValidationError("نام شخص رزروکننده الزامی است.", "guestName")
     }
   }
 
