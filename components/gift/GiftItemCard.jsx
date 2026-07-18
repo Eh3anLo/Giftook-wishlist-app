@@ -276,7 +276,8 @@ export default function GiftItemCard({
       <ConfirmDialog
         open={showDeleteDialog}
         title="حذف هدیه"
-        description={`آیا مطمئن هستید که می‌خواهید «${item.title}» را حذف کنید؟ این عمل قابل بازگشت نیست.`}
+        // description={`آیا مطمئن هستید که می‌خواهید «${item.title}» را حذف کنید؟ این عمل قابل بازگشت نیست.`}
+        description={"آیا از حذف این آیتم مطمئن هستید؟"}
         confirmLabel={deleting ? "در حال حذف..." : "حذف"}
         cancelLabel="انصراف"
         onConfirm={handleDelete}
