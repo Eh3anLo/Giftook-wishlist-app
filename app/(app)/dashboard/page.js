@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth.js'
 import { getWishlistsByUser } from '@/services/wishlist.service.js'
+import { getUserStats } from '@/services/stats.service.js'
 import WishlistGrid from '@/components/wishlist/WishlistGrid'
+import StatsOverview from '@/components/dashboard/StatsOverview'
 
 /**
  * DashboardPage — Server Component.
@@ -26,10 +28,10 @@ export default async function DashboardPage({ searchParams }) {
   const resolvedParams = await searchParams
   const page = Math.max(1, parseInt(resolvedParams?.page ?? '1', 10) || 1)
 
-  const { wishlists, total } = await getWishlistsByUser(session.user.id, {
-    page,
-    pageSize: PAGE_SIZE,
-  })
+  const [{ wishlists, total }, stats] = await Promise.all([
+    getWishlistsByUser(session.user.id, { page, pageSize: PAGE_SIZE }),
+    getUserStats(session.user.id),
+  ])
 
   return (
     <div dir="rtl" className="mx-auto max-w-5xl">
@@ -45,14 +47,8 @@ export default async function DashboardPage({ searchParams }) {
         </Link>
       </div>
 
-      {/* Summary stats — only shown when there are wishlists */}
-      {total > 0 && (
-        <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-          <span>
-            مجموع <span className="font-medium text-foreground">{total}</span> لیست
-          </span>
-        </div>
-      )}
+      {/* Stats overview — only shown when there's at least one wishlist */}
+      {total > 0 && <StatsOverview stats={stats} />}
 
       {/* Wishlist grid with pagination */}
       <WishlistGrid
