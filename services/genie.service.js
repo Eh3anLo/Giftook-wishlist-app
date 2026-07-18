@@ -15,17 +15,50 @@ const MAX_CONVERSATION_MESSAGES = 14
 // ever run multiple server instances.
 const requestLog = new Map()
 
-function checkRateLimit(userId) {
-  const dailyLimit = Number(process.env.GENIE_DAILY_LIMIT) || 15
+function getDailyLimit() {
+  return Number(process.env.GENIE_DAILY_LIMIT) || 15
+}
+
+/** Returns this user's timestamps still inside the 24h window (no mutation). */
+function getActiveTimestamps(userId) {
   const now = Date.now()
-  const timestamps = (requestLog.get(userId) ?? []).filter((t) => now - t < DAY_MS)
+  return (requestLog.get(userId) ?? []).filter((t) => now - t < DAY_MS)
+}
+
+function checkRateLimit(userId) {
+  const dailyLimit = getDailyLimit()
+  const timestamps = getActiveTimestamps(userId)
 
   if (timestamps.length >= dailyLimit) {
-    throw new TooManyRequestsError()
+    const resetAt = Math.min(...timestamps) + DAY_MS
+    throw new TooManyRequestsError(undefined, resetAt)
   }
 
-  timestamps.push(now)
+  timestamps.push(Date.now())
   requestLog.set(userId, timestamps)
+}
+
+/**
+ * Returns a snapshot of the caller's Genie usage for today, WITHOUT
+ * consuming a request. Used to show "X of Y requests left today" in the UI
+ * before the user has generated anything yet.
+ *
+ * @param {string} userId
+ * @returns {{ used: number, limit: number, remaining: number, resetAt: number|null }}
+ *   resetAt is an epoch-ms timestamp for when the oldest counted request
+ *   ages out of the 24h window (assuming no further requests are made).
+ */
+export function getGenieUsage(userId) {
+  const dailyLimit = getDailyLimit()
+  const timestamps = getActiveTimestamps(userId)
+  const used = timestamps.length
+
+  return {
+    used,
+    limit: dailyLimit,
+    remaining: Math.max(dailyLimit - used, 0),
+    resetAt: used > 0 ? Math.min(...timestamps) + DAY_MS : null,
+  }
 }
 
 /** Test-only helper — clears the in-memory rate limit between test cases. */
@@ -332,7 +365,7 @@ async function callGenieModel(messages) {
  * @param {string} wishlistId
  * @param {string} userId  Must own the wishlist.
  * @param {{ description: string, budget?: number, occasion?: string }} data  budget is in Toman
- * @returns {Promise<{ suggestions: object[], conversationMessages: object[] }>}
+ * @returns {Promise<{ suggestions: object[], conversationMessages: object[], usage: object }>}
  */
 export async function generateGiftIdeas(wishlistId, userId, data) {
   const wishlist = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
@@ -354,6 +387,7 @@ export async function generateGiftIdeas(wishlistId, userId, data) {
   return {
     suggestions,
     conversationMessages: [...messages, { role: 'assistant', content: assistantContent }],
+    usage: getGenieUsage(userId),
   }
 }
 
@@ -365,7 +399,7 @@ export async function generateGiftIdeas(wishlistId, userId, data) {
  * @param {string} wishlistId
  * @param {string} userId  Must own the wishlist.
  * @param {{ conversationMessages: object[], followUp: string }} params
- * @returns {Promise<{ suggestions: object[], conversationMessages: object[] }>}
+ * @returns {Promise<{ suggestions: object[], conversationMessages: object[], usage: object }>}
  */
 export async function refineGiftIdeas(wishlistId, userId, { conversationMessages, followUp }) {
   const wishlist = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
@@ -409,5 +443,6 @@ export async function refineGiftIdeas(wishlistId, userId, { conversationMessages
   return {
     suggestions,
     conversationMessages: [...messages, { role: 'assistant', content: assistantContent }],
+    usage: getGenieUsage(userId),
   }
 }

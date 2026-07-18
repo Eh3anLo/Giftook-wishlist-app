@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const OCCASIONS = [
   { value: '', label: 'مهم نیست' },
@@ -16,6 +16,15 @@ const QUICK_FOLLOW_UPS = [
   { label: 'خاص‌تر و باکیفیت‌تر', text: 'گزینه‌های خاص‌تر و باکیفیت‌تری پیشنهاد بده، حتی اگر گرون‌تره.' },
 ]
 
+function formatResetTime(resetAt) {
+  if (!resetAt) return null
+  try {
+    return new Date(resetAt).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return null
+  }
+}
+
 export default function GenieDialog({ wishlistId, onItemAdded }) {
   const [open, setOpen] = useState(false)
   const [description, setDescription] = useState('')
@@ -24,26 +33,57 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
   const [loading, setLoading] = useState(false)
   const [refining, setRefining] = useState(false)
   const [error, setError] = useState(null)
+  const [errorResetAt, setErrorResetAt] = useState(null)
   const [suggestions, setSuggestions] = useState([])
   const [conversationMessages, setConversationMessages] = useState(null)
   const [followUpText, setFollowUpText] = useState('')
   const [addingIndex, setAddingIndex] = useState(null)
   const [addedIndexes, setAddedIndexes] = useState(new Set())
+  const [usage, setUsage] = useState(null)
+
+  // Fetch today's remaining quota as soon as the dialog opens, before the
+  // user has generated anything yet.
+  useEffect(() => {
+    if (!open) return
+
+    let cancelled = false
+    fetch('/api/genie/usage')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data) setUsage(data)
+      })
+      .catch(() => {})
+
+    return () => {
+      cancelled = true
+    }
+  }, [open])
 
   function reset() {
     setDescription('')
     setBudget('')
     setOccasion('')
     setError(null)
+    setErrorResetAt(null)
     setSuggestions([])
     setConversationMessages(null)
     setFollowUpText('')
     setAddedIndexes(new Set())
   }
 
+  function handleErrorResponse(data) {
+    setError(data.error || 'خطایی رخ داد. دوباره امتحان کن.')
+    setErrorResetAt(data.resetAt ?? null)
+    if (data.resetAt !== undefined) {
+      // A 429 response also tells us the quota is exhausted right now.
+      setUsage((prev) => (prev ? { ...prev, remaining: 0 } : prev))
+    }
+  }
+
   async function handleGenerate(e) {
     e.preventDefault()
     setError(null)
+    setErrorResetAt(null)
     setLoading(true)
     setSuggestions([])
     setConversationMessages(null)
@@ -63,12 +103,13 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'خطایی رخ داد. دوباره امتحان کن.')
+        handleErrorResponse(data)
         return
       }
 
       setSuggestions(data.suggestions ?? [])
       setConversationMessages(data.conversationMessages ?? null)
+      if (data.usage) setUsage(data.usage)
     } catch {
       setError('ارتباط با سرور برقرار نشد.')
     } finally {
@@ -81,6 +122,7 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
     if (!followUp || !conversationMessages) return
 
     setError(null)
+    setErrorResetAt(null)
     setRefining(true)
 
     try {
@@ -93,12 +135,13 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
       const data = await res.json()
 
       if (!res.ok) {
-        setError(data.error || 'خطایی رخ داد. دوباره امتحان کن.')
+        handleErrorResponse(data)
         return
       }
 
       setSuggestions(data.suggestions ?? [])
       setConversationMessages(data.conversationMessages ?? null)
+      if (data.usage) setUsage(data.usage)
       setAddedIndexes(new Set())
       setFollowUpText('')
     } catch {
@@ -139,6 +182,8 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
     }
   }
 
+  const quotaExhausted = usage && usage.remaining <= 0
+
   return (
     <>
       <button
@@ -159,7 +204,17 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-lg border border-border bg-background shadow-lg">
             <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <h2 className="text-lg font-semibold text-foreground">Genie — دستیار پیشنهاد هدیه</h2>
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Genie — دستیار پیشنهاد هدیه</h2>
+                {usage && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {usage.remaining} از {usage.limit} درخواست امروز باقی مانده
+                    {quotaExhausted && errorResetAt === null && usage.resetAt
+                      ? ` — از ${formatResetTime(usage.resetAt)} دوباره در دسترسه`
+                      : ''}
+                  </p>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => {
@@ -185,7 +240,8 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                       rows={3}
                       maxLength={500}
                       required
-                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                      disabled={quotaExhausted}
+                      className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                     />
                   </div>
 
@@ -199,7 +255,8 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                         value={budget}
                         onChange={(e) => setBudget(e.target.value)}
                         placeholder="مثلاً ۱۵۰۰۰۰۰"
-                        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                        disabled={quotaExhausted}
+                        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                       />
                     </div>
                     <div>
@@ -207,7 +264,8 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                       <select
                         value={occasion}
                         onChange={(e) => setOccasion(e.target.value)}
-                        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                        disabled={quotaExhausted}
+                        className="w-full rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                       >
                         {OCCASIONS.map((o) => (
                           <option key={o.value} value={o.value}>
@@ -220,15 +278,20 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
 
                   <button
                     type="submit"
-                    disabled={loading}
+                    disabled={loading || quotaExhausted}
                     className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                   >
-                    {loading ? 'در حال فکر کردن...' : 'پیشنهاد بگیر'}
+                    {loading ? 'در حال فکر کردن...' : quotaExhausted ? 'سهمیه امروز تمام شده' : 'پیشنهاد بگیر'}
                   </button>
                 </form>
               )}
 
-              {error && <p className="mt-3 text-sm text-destructive">{error}</p>}
+              {error && (
+                <p className="mt-3 text-sm text-destructive">
+                  {error}
+                  {errorResetAt && ` (دوباره از ${formatResetTime(errorResetAt)} در دسترس است)`}
+                </p>
+              )}
 
               {suggestions.length > 0 && (
                 <>
@@ -281,7 +344,7 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                           <button
                             key={q.label}
                             type="button"
-                            disabled={refining}
+                            disabled={refining || quotaExhausted}
                             onClick={() => handleRefine(q.text)}
                             className="rounded-full border border-border px-3 py-1 text-xs text-foreground hover:bg-muted disabled:opacity-50"
                           >
@@ -303,11 +366,12 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                           onChange={(e) => setFollowUpText(e.target.value)}
                           placeholder="مثلاً: چیز کاربردی‌تر برای خونه پیشنهاد بده"
                           maxLength={200}
-                          className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50"
+                          disabled={quotaExhausted}
+                          className="flex-1 rounded-md border border-border bg-card px-3 py-2 text-sm text-foreground outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50"
                         />
                         <button
                           type="submit"
-                          disabled={refining || !followUpText.trim()}
+                          disabled={refining || quotaExhausted || !followUpText.trim()}
                           className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
                         >
                           {refining ? '...' : 'ارسال'}
