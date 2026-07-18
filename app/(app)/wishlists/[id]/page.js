@@ -72,7 +72,7 @@ export default async function WishlistDetailPage({ params }) {
       {isOwner && allReserved && (
         <div
           role="status"
-          className="rounded-xl border border-green-300 bg-green-50 px-5 py-4 text-center text-base font-semibold text-green-800"
+          className="rounded-xl border border-green-500 bg-green-200 px-5 py-4 text-center text-base font-semibold text-green-800"
         >
           🎉 تمام آیتم‌های این لیست رزرو شده‌اند!
         </div>
