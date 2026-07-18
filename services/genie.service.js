@@ -1,9 +1,14 @@
 import prisma from '@/lib/prisma.js'
-import { validateGenieRequest } from '@/lib/validations.js'
+import { validateGenieRequest, validateGenieFollowUp } from '@/lib/validations.js'
 import { ValidationError, ForbiddenError, TooManyRequestsError } from '@/lib/errors.js'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const DAY_MS = 24 * 60 * 60 * 1000
+
+// A conversation can grow by roughly 2 messages per follow-up turn
+// (user + assistant), on top of the initial system + user + assistant.
+// This caps it at about 6 follow-up turns before asking for a fresh session.
+const MAX_CONVERSATION_MESSAGES = 14
 
 // In-memory per-user rate limit. Resets on server restart — fine for a
 // single-instance student project. Swap for a DB/Redis counter if you
@@ -63,6 +68,9 @@ function buildMessages({ description, budget, occasion }) {
 TASK
 Given a short description of a gift recipient, propose exactly 6 specific, realistic, purchasable gift ideas.
 Do not think out loud, do not show your reasoning — respond directly with the final JSON object only.
+The user may send follow-up messages after your first answer (e.g. asking for cheaper options, different
+categories, or more of a certain type) — treat each follow-up as a request to revise your previous suggestions
+while still following every rule below.
 
 LANGUAGE — VERY IMPORTANT
 The description you receive from the user may be in Persian or English. Regardless of the input language, every text field in your output ("title", "description", "category", "searchQuery") MUST be written in Persian (Farsi), not English. Brand names may stay in Latin script (e.g. "Stanley", "AeroPress"), but everything else — the product name itself, the description sentence, the category, and the search phrase — must be natural, fluent Persian.
@@ -72,7 +80,7 @@ CURRENCY
 "estimatedMinPrice" and "estimatedMaxPrice" are in Iranian Toman (the everyday currency unit in Iran) — not Rial, not USD. Use realistic, rounded values for the Iranian market (e.g. rounded to the nearest 10,000 Toman).
 
 OUTPUT CONTRACT — READ CAREFULLY
-Respond with ONE JSON object and NOTHING else. No markdown code fences, no leading or trailing text, no comments, no trailing commas. The object must have this exact shape:
+Respond with ONE JSON object and NOTHING else, on every turn including follow-ups. No markdown code fences, no leading or trailing text, no comments, no trailing commas. The object must have this exact shape:
 
 {
   "suggestions": [
@@ -88,7 +96,7 @@ Respond with ONE JSON object and NOTHING else. No markdown code fences, no leadi
 }
 
 RULES
-1. "suggestions" must contain exactly 6 items.
+1. "suggestions" must contain exactly 6 items, every turn, even after a follow-up.
 2. estimatedMinPrice and estimatedMaxPrice are plain numbers (no "تومان", no commas, no strings, no ranges).
 3. estimatedMaxPrice must be greater than or equal to estimatedMinPrice.
 4. All 6 titles must be different products, not variations of the same item.
@@ -123,6 +131,24 @@ function extractSuggestionsArray(parsed) {
 }
 
 /**
+ * Filters and bounds a conversation history array coming from the client,
+ * so an arbitrary payload can't be smuggled into the model call.
+ * @param {*} messages
+ * @returns {Array<{role: string, content: string}>|null}
+ */
+function sanitizeIncomingConversation(messages) {
+  if (!Array.isArray(messages)) return null
+
+  const allowedRoles = ['system', 'user', 'assistant']
+  const cleaned = messages
+    .filter((m) => m && allowedRoles.includes(m.role) && typeof m.content === 'string')
+    .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) }))
+    .slice(0, MAX_CONVERSATION_MESSAGES)
+
+  return cleaned.length > 0 ? cleaned : null
+}
+
+/**
  * Cleans and bounds a single raw suggestion object from the model.
  * Returns null if the item is unusable (e.g. missing title).
  * Prices are treated as Iranian Toman.
@@ -152,8 +178,7 @@ export function sanitizeSuggestion(raw) {
     estimatedMinPrice: min, // Toman
     estimatedMaxPrice: max, // Toman
     searchQuery,
-    searchUrl: `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
-    // searchUrl: `https://www.digikala.com/search/?q=${encodeURIComponent(searchQuery)}`,
+    searchUrl: `https://www.digikala.com/search/?q=${encodeURIComponent(searchQuery)}`,
   }
 }
 
@@ -223,8 +248,6 @@ async function callOpenRouter(messages, { forceJsonMode, disableReasoning } = {}
   const data = await response.json()
   const content = extractContent(data)
 
-  console.log(content)
-
   if (!content) {
     // Empty content, likely because a reasoning model used its whole
     // budget thinking. One automatic retry with reasoning forced off
@@ -240,8 +263,13 @@ async function callOpenRouter(messages, { forceJsonMode, disableReasoning } = {}
 
 /**
  * Calls the configured OpenRouter model and returns a cleaned array of
- * gift suggestions. Gives the model one repair attempt if its first
- * response isn't valid JSON matching the schema, before giving up.
+ * gift suggestions plus the raw assistant text that produced them (so the
+ * caller can append it to the conversation history for future turns).
+ * Gives the model one repair attempt if its first response isn't valid
+ * JSON matching the schema, before giving up.
+ *
+ * @param {Array<{role: string, content: string}>} messages
+ * @returns {Promise<{ suggestions: object[], assistantContent: string }>}
  */
 async function callGenieModel(messages) {
   let raw = await callOpenRouter(messages, { forceJsonMode: true })
@@ -256,7 +284,9 @@ async function callGenieModel(messages) {
   let suggestionsArray = parsed ? extractSuggestionsArray(parsed) : null
 
   // Repair pass: lighter models sometimes wrap JSON in prose or break
-  // syntax slightly. Give it one chance to fix its own output.
+  // syntax slightly. Give it one chance to fix its own output. This
+  // repair round-trip is intentionally NOT kept in the conversation
+  // history returned to the caller — only the final valid answer is.
   if (!suggestionsArray) {
     const repairMessages = [
       ...messages,
@@ -288,7 +318,7 @@ async function callGenieModel(messages) {
     throw new Error('هیچ پیشنهاد معتبری تولید نشد.')
   }
 
-  return suggestions
+  return { suggestions, assistantContent: raw }
 }
 
 // ---------------------------------------------------------------------------
@@ -296,12 +326,13 @@ async function callGenieModel(messages) {
 // ---------------------------------------------------------------------------
 
 /**
- * Generates gift ideas for the given wishlist owner.
+ * Generates gift ideas for the given wishlist owner. Starts a new
+ * conversation — use refineGiftIdeas for follow-up turns.
  *
  * @param {string} wishlistId
  * @param {string} userId  Must own the wishlist.
  * @param {{ description: string, budget?: number, occasion?: string }} data  budget is in Toman
- * @returns {Promise<object[]>} Sanitized array of gift suggestions (prices in Toman)
+ * @returns {Promise<{ suggestions: object[], conversationMessages: object[] }>}
  */
 export async function generateGiftIdeas(wishlistId, userId, data) {
   const wishlist = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
@@ -318,5 +349,65 @@ export async function generateGiftIdeas(wishlistId, userId, data) {
   checkRateLimit(userId)
 
   const messages = buildMessages(data)
-  return callGenieModel(messages)
+  const { suggestions, assistantContent } = await callGenieModel(messages)
+
+  return {
+    suggestions,
+    conversationMessages: [...messages, { role: 'assistant', content: assistantContent }],
+  }
+}
+
+/**
+ * Continues an existing Genie conversation with a follow-up message
+ * (e.g. "ارزون‌تر پیشنهاد بده" / "چیز دیگه‌ای پیشنهاد بده"), reusing the
+ * conversation history the client got back from the previous call.
+ *
+ * @param {string} wishlistId
+ * @param {string} userId  Must own the wishlist.
+ * @param {{ conversationMessages: object[], followUp: string }} params
+ * @returns {Promise<{ suggestions: object[], conversationMessages: object[] }>}
+ */
+export async function refineGiftIdeas(wishlistId, userId, { conversationMessages, followUp }) {
+  const wishlist = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
+
+  if (!wishlist || wishlist.userId !== userId) {
+    throw new ForbiddenError()
+  }
+
+  const followUpValidation = validateGenieFollowUp({ followUp })
+  if (!followUpValidation.valid) {
+    throw new ValidationError(followUpValidation.error, followUpValidation.field)
+  }
+
+  const priorMessages = sanitizeIncomingConversation(conversationMessages)
+  if (!priorMessages) {
+    throw new ValidationError(
+      'تاریخچه مکالمه نامعتبر است. یک درخواست جدید با Genie شروع کن.',
+      'conversationMessages'
+    )
+  }
+
+  if (priorMessages.length >= MAX_CONVERSATION_MESSAGES) {
+    throw new ValidationError(
+      'این مکالمه به سقف طول مجاز رسیده. یک درخواست جدید با Genie شروع کن.',
+      'conversationMessages'
+    )
+  }
+
+  checkRateLimit(userId)
+
+  const messages = [
+    ...priorMessages,
+    {
+      role: 'user',
+      content: `${followUp}\nRemember: respond with ONLY the JSON object in the same schema as before, all text fields in Persian, exactly 6 suggestions.`,
+    },
+  ]
+
+  const { suggestions, assistantContent } = await callGenieModel(messages)
+
+  return {
+    suggestions,
+    conversationMessages: [...messages, { role: 'assistant', content: assistantContent }],
+  }
 }

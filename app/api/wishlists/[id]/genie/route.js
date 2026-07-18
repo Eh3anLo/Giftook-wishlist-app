@@ -1,12 +1,18 @@
 import { auth } from '@/lib/auth.js'
-import { generateGiftIdeas } from '@/services/genie.service.js'
+import { generateGiftIdeas, refineGiftIdeas } from '@/services/genie.service.js'
 import { handleServiceError } from '@/lib/api-helpers.js'
 
 /**
  * POST /api/wishlists/[id]/genie
- * Generates AI gift suggestions for the wishlist owner. Requires auth + ownership.
- * Body: { description: string, budget?: number, occasion?: string }
- * Returns: { suggestions: object[] }
+ *
+ * New conversation:
+ *   Body: { description: string, budget?: number, occasion?: string }
+ *
+ * Follow-up in an existing conversation:
+ *   Body: { followUp: string, conversationMessages: object[] }
+ *
+ * Returns: { suggestions: object[], conversationMessages: object[] }
+ * conversationMessages must be sent back unmodified on the next follow-up call.
  */
 export async function POST(req, { params }) {
   try {
@@ -24,17 +30,15 @@ export async function POST(req, { params }) {
       return Response.json({ error: 'درخواست نامعتبر است.' }, { status: 400 })
     }
 
-    const { description, budget, occasion } = body ?? {}
+    const { description, budget, occasion, followUp, conversationMessages } = body ?? {}
 
-    const suggestions = await generateGiftIdeas(id, session.user.id, {
-      description,
-      budget,
-      occasion,
-    })
+    const result = followUp
+      ? await refineGiftIdeas(id, session.user.id, { conversationMessages, followUp })
+      : await generateGiftIdeas(id, session.user.id, { description, budget, occasion })
 
-    return Response.json({ suggestions }, { status: 200 })
+    return Response.json(result, { status: 200 })
   } catch (error) {
-    console.error(error)
+    console.log(error)
     return handleServiceError(error)
   }
 }
