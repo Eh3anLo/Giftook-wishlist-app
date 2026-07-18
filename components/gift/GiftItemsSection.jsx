@@ -1,16 +1,18 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import GiftItemCard from "@/components/gift/GiftItemCard"
 import GiftItemForm from "@/components/gift/GiftItemForm"
 import GenieDialog from "./GenieDialog.jsx"
+import GiftItemsFilterBar from "./GiftItemsFilterBar.jsx"
+import { filterGiftItems } from "@/lib/giftItemFilters.js"
 
 /**
  * GiftItemsSection — Client Component.
- * Wraps the gift items list and the "افزودن هدیه" button with add-form toggle.
- * Extracted from the Server Component page so that interactive state (showForm)
- * lives here while the page shell stays a Server Component.
+ * Wraps the gift items list, the filter bar, and the "افزودن هدیه" button
+ * with add-form toggle. Filtering is purely client-side over the already
+ * loaded items array — no additional network requests.
  *
  * Props:
  *  - items (array): gift item objects from the service
@@ -28,11 +30,18 @@ export default function GiftItemsSection({
 }) {
   const router = useRouter()
   const [showAddForm, setShowAddForm] = useState(false)
+  const [priorityFilter, setPriorityFilter] = useState("all")
+  const [reservationFilter, setReservationFilter] = useState("all")
 
   function handleAddSuccess() {
     setShowAddForm(false)
     router.refresh()
   }
+
+  const filteredItems = useMemo(
+    () => filterGiftItems(items, { priority: priorityFilter, reservation: reservationFilter }),
+    [items, priorityFilter, reservationFilter]
+  )
 
   return (
     <section>
@@ -67,14 +76,29 @@ export default function GiftItemsSection({
         </div>
       )}
 
+      {/* Filter bar — only worth showing once there's something to filter */}
+      {items.length > 0 && (
+        <GiftItemsFilterBar
+          items={items}
+          priority={priorityFilter}
+          reservation={reservationFilter}
+          onPriorityChange={setPriorityFilter}
+          onReservationChange={setReservationFilter}
+        />
+      )}
+
       {/* Items list */}
       {items.length === 0 ? (
         <p className="rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
           هنوز هیچ آیتمی به این لیست اضافه نشده.
         </p>
+      ) : filteredItems.length === 0 ? (
+        <p className="rounded-xl border border-border bg-card px-5 py-8 text-center text-sm text-muted-foreground">
+          هیچ آیتمی با این فیلتر مطابقت ندارد.
+        </p>
       ) : (
         <ul className="space-y-3">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <li key={item.id}>
               <GiftItemCard
                 item={item}

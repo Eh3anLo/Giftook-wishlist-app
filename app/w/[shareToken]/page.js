@@ -4,7 +4,7 @@ import Image from "next/image"
 import { auth } from "@/lib/auth.js"
 
 import { getWishlistByShareToken } from "@/services/wishlist.service.js"
-import GiftItemCard from "@/components/gift/GiftItemCard"
+import PublicGiftItemsList from "@/components/gift/PublicGiftItemsList"
 import Navbar from "@/components/layout/Navbar"
 /**
  * Public wishlist share page — Server Component.
@@ -103,24 +103,13 @@ export default async function SharePage({ params }) {
             )}
           </div>
 
-          {/* Gift items */}
+          {/* Gift items — with client-side filter */}
           {items.length === 0 ? (
             <div className="rounded-xl border border-border bg-card p-8 text-center text-muted-foreground">
               هنوز هیچ هدیه‌ای به این لیست اضافه نشده است.
             </div>
           ) : (
-            <div className="space-y-3">
-              {items.map((item) => (
-                <GiftItemCard
-                  key={item.id}
-                  item={item}
-                  wishlistId={wishlist.id}
-                  isOwner={false}
-                  showReserverIdentity={false}
-                  currentUserId={userId}
-                />
-              ))}
-            </div>
+            <PublicGiftItemsList items={items} wishlistId={wishlist.id} currentUserId={userId} />
           )}
         </div>
     </main>
