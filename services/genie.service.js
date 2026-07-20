@@ -212,6 +212,7 @@ export function sanitizeSuggestion(raw) {
     estimatedMaxPrice: max, // Toman
     searchQuery,
     searchUrl: `https://www.digikala.com/search/?q=${encodeURIComponent(searchQuery)}`,
+    searchUrl2: `https://www.google.com/search?q=${encodeURIComponent(searchQuery)}`,
   }
 }
 

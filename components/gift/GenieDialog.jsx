@@ -317,7 +317,10 @@ export default function GenieDialog({ wishlistId, onItemAdded }) {
                                 </span>
                               )}
                               <a href={s.searchUrl} target="_blank" rel="noreferrer" className="underline">
-                                جستجو
+                            جستجو در گوگل
+                              </a>
+                              <a href={s.searchUrl2} target="_blank" rel="noreferrer" className="underline">
+                                جستجو در دیجی کالا
                               </a>
                             </div>
                           </div>

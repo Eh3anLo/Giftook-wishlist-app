@@ -2,7 +2,6 @@ import NextAuth from 'next-auth'
 import { authConfig } from '@/lib/auth.config.js'
 import { NextResponse } from 'next/server'
 
-// Use the edge-compatible auth config (no Prisma adapter, no bcrypt)
 const { auth } = NextAuth(authConfig)
 
 export default auth(function middleware(req) {
