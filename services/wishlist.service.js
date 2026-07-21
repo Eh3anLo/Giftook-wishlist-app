@@ -3,6 +3,12 @@ import prisma from "@/lib/prisma.js"
 import { validateWishlist } from "@/lib/validations.js"
 import { ValidationError, ForbiddenError } from "@/lib/errors.js"
 
+function buildArchivedFilter(status) {
+  if (status === "archived") return { archived: true }
+  if (status === "all") return {}
+  return { archived: false } // default: "active"
+}
+
 // ---------------------------------------------------------------------------
 // createWishlist
 // ---------------------------------------------------------------------------
@@ -63,18 +69,21 @@ export async function createWishlist(
  * Each wishlist includes item and reservation counts.
  *
  * @param {string} userId
- * @param {{ page?: number, pageSize?: number }} options
+ * @param {{ page?: number, pageSize?: number, status?: 'active'|'archived'|'all' }} options
+ *   status defaults to 'active' (archived: false). Pass 'archived' to see only
+ *   archived lists, or 'all' to see everything regardless of archived state.
  * @returns {Promise<{ wishlists: object[], total: number }>}
  */
 export async function getWishlistsByUser(
   userId,
-  { page = 1, pageSize = 10 } = {}
+  { page = 1, pageSize = 10, status = "active" } = {}
 ) {
   const skip = (page - 1) * pageSize
+  const where = { userId, ...buildArchivedFilter(status) }
 
   const [wishlists, total] = await Promise.all([
     prisma.wishlist.findMany({
-      where: { userId },
+      where,
       skip,
       take: pageSize,
       orderBy: { createdAt: "desc" },
@@ -92,7 +101,7 @@ export async function getWishlistsByUser(
         },
       },
     }),
-    prisma.wishlist.count({ where: { userId } }),
+    prisma.wishlist.count({ where }),
   ])
 
   // Compute reservedCount per wishlist and strip raw items array before returning
@@ -208,6 +217,8 @@ export async function getWishlistById(wishlistId, requestingUserId) {
  * Returns a wishlist looked up by its share token.
  * Returns null if the wishlist is private.
  * Reserver identities are NEVER exposed through this endpoint.
+ * Archived wishlists are still returned here — archiving only affects the
+ * owner's dashboard view, not an already-shared link.
  *
  * @param {string} shareToken
  * @returns {Promise<object|null>}
@@ -312,6 +323,52 @@ export async function updateWishlist(
   return prisma.wishlist.update({
     where: { id: wishlistId },
     data: updateData,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// archiveWishlist / unarchiveWishlist
+// ---------------------------------------------------------------------------
+
+/**
+ * Archives a wishlist (hides it from the default dashboard view).
+ * Validates ownership before archiving.
+ *
+ * @param {string} wishlistId
+ * @param {string} userId
+ * @returns {Promise<object>} Updated wishlist record
+ */
+export async function archiveWishlist(wishlistId, userId) {
+  const existing = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
+
+  if (!existing || existing.userId !== userId) {
+    throw new ForbiddenError()
+  }
+
+  return prisma.wishlist.update({
+    where: { id: wishlistId },
+    data: { archived: true },
+  })
+}
+
+/**
+ * Restores a previously archived wishlist back to the active dashboard view.
+ * Validates ownership before unarchiving.
+ *
+ * @param {string} wishlistId
+ * @param {string} userId
+ * @returns {Promise<object>} Updated wishlist record
+ */
+export async function unarchiveWishlist(wishlistId, userId) {
+  const existing = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
+
+  if (!existing || existing.userId !== userId) {
+    throw new ForbiddenError()
+  }
+
+  return prisma.wishlist.update({
+    where: { id: wishlistId },
+    data: { archived: false },
   })
 }
 

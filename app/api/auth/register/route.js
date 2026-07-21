@@ -39,7 +39,7 @@ export async function POST(req) {
     // Hash the password
     const passwordHash = await bcrypt.hash(password, 12)
 
-    // Create the user — never include passwordHash in the response
+    // Create the user
     await createUser({ email: email.trim(), name: name?.trim() ?? null, passwordHash })
 
     return Response.json({ success: true }, { status: 201 })

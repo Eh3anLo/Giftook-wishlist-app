@@ -45,6 +45,8 @@ export default function WishlistCard({ wishlist }) {
   const router = useRouter()
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [archiving, setArchiving] = useState(false)
+  const [archiveError, setArchiveError] = useState('')
 
   // Support both _count.items shape (from getWishlistsByUser) and flat itemCount
   const itemCount = wishlist.itemCount ?? wishlist._count?.items ?? 0
@@ -65,11 +67,35 @@ export default function WishlistCard({ wishlist }) {
     }
   }
 
+  async function handleArchiveToggle() {
+    setArchiveError('')
+    setArchiving(true)
+    try {
+      const res = await fetch(`/api/wishlists/${wishlist.id}/archive`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived: !wishlist.archived }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setArchiveError(data.error ?? 'خطا در تغییر وضعیت آرشیو.')
+        return
+      }
+      router.refresh()
+    } catch {
+      setArchiveError('خطا در ارتباط با سرور.')
+    } finally {
+      setArchiving(false)
+    }
+  }
+
   return (
     <>
       <div
         dir="rtl"
-        className="flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md"
+        className={`flex flex-col rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md ${
+          wishlist.archived ? 'opacity-60' : ''
+        }`}
       >
         {/* Header: title + badges */}
         <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
@@ -81,6 +107,13 @@ export default function WishlistCard({ wishlist }) {
           </Link>
 
           <div className="flex flex-shrink-0 flex-wrap gap-1">
+            {/* Archived badge */}
+            {wishlist.archived && (
+              <span className="inline-flex items-center rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-700">
+                آرشیوشده
+              </span>
+            )}
+
             {/* Visibility badge */}
             <span
               className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -141,7 +174,7 @@ export default function WishlistCard({ wishlist }) {
         )}
 
         {/* Quick-action controls */}
-        <div className="mt-auto flex items-center gap-2 border-t border-border pt-3">
+        <div className="mt-auto flex flex-wrap items-center gap-2 border-t border-border pt-3">
           {/* View */}
           <Link
             href={`/wishlists/${wishlist.id}`}
@@ -158,6 +191,16 @@ export default function WishlistCard({ wishlist }) {
             ویرایش
           </Link>
 
+          {/* Archive / Unarchive */}
+          <button
+            type="button"
+            onClick={handleArchiveToggle}
+            disabled={archiving}
+            className="flex-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 disabled:opacity-50"
+          >
+            {archiving ? '...' : wishlist.archived ? 'بازگردانی' : 'آرشیو'}
+          </button>
+
           {/* Delete */}
           <button
             type="button"
@@ -168,6 +211,12 @@ export default function WishlistCard({ wishlist }) {
             {deleting ? '...' : 'حذف'}
           </button>
         </div>
+
+        {archiveError && (
+          <p role="alert" className="mt-2 text-xs text-destructive">
+            {archiveError}
+          </p>
+        )}
       </div>
 
       {/* Delete confirmation dialog */}

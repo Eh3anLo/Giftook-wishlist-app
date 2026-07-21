@@ -71,6 +71,7 @@ model Wishlist {
   visibility           Visibility    @default(private)
   shareToken           String        @unique @map("share_token") @db.VarChar(64)
   showReserverIdentity Boolean       @default(false) @map("show_reserver_identity")
+  archived             Boolean       @default(false)
   createdAt            DateTime      @default(now()) @map("created_at")
   updatedAt            DateTime      @updatedAt @map("updated_at")
   items                GiftItem[]

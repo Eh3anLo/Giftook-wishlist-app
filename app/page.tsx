@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button"
 
 /**
  * Landing page — shown to all visitors (authenticated or not).
- * All text is in Persian. RTL layout is inherited from the root html element.
  */
 export default function Page() {
   return (

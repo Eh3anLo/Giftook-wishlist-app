@@ -14,7 +14,8 @@ import EmptyState from '@/components/common/EmptyState'
  *  - page (number): current page number (1-indexed)
  *  - pageSize (number): items per page
  *  - emptyMessage (string): optional custom empty state message
- *  - emptyAction (object): optional { label, href } for empty state CTA
+ *  - emptyAction (object|null): optional { label, href } for empty state CTA
+ *  - extraQuery (object): extra query params to preserve across pagination links (e.g. { status: 'archived' })
  */
 export default function WishlistGrid({
   wishlists = [],
@@ -23,6 +24,7 @@ export default function WishlistGrid({
   pageSize = 20,
   emptyMessage = 'هنوز لیستی نساخته‌اید.',
   emptyAction = { label: 'لیست جدید', href: '/wishlists/new' },
+  extraQuery = {},
 }) {
   if (!wishlists.length) {
     return <EmptyState message={emptyMessage} action={emptyAction} />
@@ -32,6 +34,11 @@ export default function WishlistGrid({
   const hasPrev = page > 1
   const hasNext = page < totalPages
   const showPagination = total > pageSize
+
+  function buildHref(targetPage) {
+    const params = new URLSearchParams({ ...extraQuery, page: String(targetPage) })
+    return `?${params.toString()}`
+  }
 
   return (
     <div dir="rtl">
@@ -48,7 +55,7 @@ export default function WishlistGrid({
           {/* Previous page */}
           {hasPrev ? (
             <Link
-              href={`?page=${page - 1}`}
+              href={buildHref(page - 1)}
               className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               قبلی →
@@ -68,7 +75,7 @@ export default function WishlistGrid({
           {/* Next page */}
           {hasNext ? (
             <Link
-              href={`?page=${page + 1}`}
+              href={buildHref(page + 1)}
               className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
             >
               ← بعدی

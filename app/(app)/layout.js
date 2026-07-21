@@ -35,7 +35,7 @@ export default async function AppLayout({ children }) {
         <main className="flex-1 overflow-auto p-4 pb-20 sm:p-6 sm:pb-6">{children}</main>
       </div>
 
-      {/* Footer — hidden on mobile (MobileNav takes that space) */}
+      {/* Footer — hidden on mobile */}
       <div className="hidden sm:block">
         <Footer />
       </div>

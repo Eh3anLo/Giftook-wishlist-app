@@ -9,8 +9,9 @@ import StatsOverview from '@/components/dashboard/StatsOverview'
 /**
  * DashboardPage — Server Component.
  * Fetches the authenticated user's wishlists (paginated, 20 per page)
- * and renders them in a grid. Supports ?page=N URL param for pagination.
- * Shows an empty state with a "ایجاد اولین لیست" CTA when no wishlists exist.
+ * and renders them in a grid. Supports ?page=N and ?status=active|archived
+ * URL params. Shows an empty state with a "ایجاد اولین لیست" CTA when no
+ * active wishlists exist.
  */
 export const metadata = {
   title: 'داشبورد',
@@ -27,9 +28,10 @@ export default async function DashboardPage({ searchParams }) {
   // searchParams may be a Promise in Next.js 15 — await it safely
   const resolvedParams = await searchParams
   const page = Math.max(1, parseInt(resolvedParams?.page ?? '1', 10) || 1)
+  const status = resolvedParams?.status === 'archived' ? 'archived' : 'active'
 
   const [{ wishlists, total }, stats] = await Promise.all([
-    getWishlistsByUser(session.user.id, { page, pageSize: PAGE_SIZE }),
+    getWishlistsByUser(session.user.id, { page, pageSize: PAGE_SIZE, status }),
     getUserStats(session.user.id),
   ])
 
@@ -47,8 +49,32 @@ export default async function DashboardPage({ searchParams }) {
         </Link>
       </div>
 
-      {/* Stats overview — only shown when there's at least one wishlist */}
-      {total > 0 && <StatsOverview stats={stats} />}
+      {/* Stats overview — only on the active tab, only when there's at least one wishlist */}
+      {status === 'active' && stats.wishlistCount > 0 && <StatsOverview stats={stats} />}
+
+      {/* Active / Archived tabs */}
+      <div className="mb-4 flex gap-1 border-b border-border">
+        <Link
+          href="?status=active"
+          className={`px-3 py-2 text-sm font-medium transition-colors ${
+            status === 'active'
+              ? 'border-b-2 border-primary text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          فعال
+        </Link>
+        <Link
+          href="?status=archived"
+          className={`px-3 py-2 text-sm font-medium transition-colors ${
+            status === 'archived'
+              ? 'border-b-2 border-primary text-foreground'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          آرشیوشده
+        </Link>
+      </div>
 
       {/* Wishlist grid with pagination */}
       <WishlistGrid
@@ -56,8 +82,13 @@ export default async function DashboardPage({ searchParams }) {
         total={total}
         page={page}
         pageSize={PAGE_SIZE}
-        emptyMessage="هنوز لیستی نساخته‌اید."
-        emptyAction={{ label: 'ایجاد اولین لیست', href: '/wishlists/new' }}
+        extraQuery={{ status }}
+        emptyMessage={
+          status === 'archived' ? 'هیچ لیست آرشیوشده‌ای نداری.' : 'هنوز لیستی نساخته‌اید.'
+        }
+        emptyAction={
+          status === 'archived' ? undefined : { label: 'ایجاد اولین لیست', href: '/wishlists/new' }
+        }
       />
     </div>
   )

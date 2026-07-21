@@ -2,10 +2,13 @@ import { auth } from '@/lib/auth.js'
 import { createWishlist, getWishlistsByUser } from '@/services/wishlist.service.js'
 import { handleServiceError } from '@/lib/api-helpers.js'
 
+const VALID_STATUS = ['active', 'archived', 'all']
+
 /**
  * GET /api/wishlists
  * Returns a paginated list of wishlists owned by the authenticated user.
- * Query params: page (default 1), pageSize (default 10)
+ * Query params: page (default 1), pageSize (default 10),
+ *               status ('active' | 'archived' | 'all', default 'active')
  */
 export async function GET(req) {
   try {
@@ -17,8 +20,10 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url)
     const page = Number(searchParams.get('page')) || 1
     const pageSize = Number(searchParams.get('pageSize')) || 10
+    const rawStatus = searchParams.get('status')
+    const status = VALID_STATUS.includes(rawStatus) ? rawStatus : 'active'
 
-    const result = await getWishlistsByUser(session.user.id, { page, pageSize })
+    const result = await getWishlistsByUser(session.user.id, { page, pageSize, status })
 
     return Response.json(result, { status: 200 })
   } catch (error) {
@@ -68,6 +73,7 @@ export async function POST(req) {
       shareToken: wishlist.shareToken,
       shareUrl: `/w/${wishlist.shareToken}`,
       showReserverIdentity: wishlist.showReserverIdentity,
+      archived: wishlist.archived,
       createdAt: wishlist.createdAt,
       itemCount: 0,
       reservedCount: 0,

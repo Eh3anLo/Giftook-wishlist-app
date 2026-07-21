@@ -148,7 +148,7 @@ Return the JSON object now — remember, ONLY the JSON object, all text fields i
     { role: 'user', content: user },
   ]
 }
-
+// ai generated
 function stripCodeFence(text) {
   return text
     .trim()
