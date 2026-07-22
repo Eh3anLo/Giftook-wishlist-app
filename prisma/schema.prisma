@@ -22,8 +22,23 @@ model User {
   reservations  Reservation[]
   sessions      Session[]
   wishlists     Wishlist[]
-
+  following     Follow[]      @relation("Following")
+  followers     Follow[]      @relation("Followers")
   @@map("users")
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  follower  User @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("Followers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@map("follows")
 }
 
 model Account {
