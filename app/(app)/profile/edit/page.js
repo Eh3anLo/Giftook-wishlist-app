@@ -24,6 +24,9 @@ export default async function EditProfilePage() {
     name: user.name ?? '',
     image: user.image ?? '',
     email: user.email,
+    bio: user.bio ?? '',
+    birthMonth: user.birthMonth ?? '',
+    birthDay: user.birthDay ?? '',
   }
 
   return (

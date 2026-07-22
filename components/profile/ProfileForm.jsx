@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import ErrorMessage from '@/components/common/ErrorMessage'
+import { JALALI_MONTH_LABELS, daysInJalaliMonth } from '@/lib/jalaliMonths.js'
 
 /**
  * ProfileForm
@@ -12,7 +13,10 @@ import ErrorMessage from '@/components/common/ErrorMessage'
  *    {
  *      name,
  *      image,
- *      email
+ *      email,
+ *      bio,
+ *      birthMonth,  // 1-12 (Jalali/Shamsi) or null
+ *      birthDay,    // 1-31 (Jalali/Shamsi) or null
  *    }
  */
 export default function ProfileForm({ initialData = {} }) {
@@ -21,10 +25,23 @@ export default function ProfileForm({ initialData = {} }) {
   const [name, setName] = useState(initialData.name ?? '')
   const [image, setImage] = useState(initialData.image ?? '')
   const [email] = useState(initialData.email ?? '')
+  const [bio, setBio] = useState(initialData.bio ?? '')
+  const [birthMonth, setBirthMonth] = useState(initialData.birthMonth ?? '')
+  const [birthDay, setBirthDay] = useState(initialData.birthDay ?? '')
 
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [fieldErrors, setFieldErrors] = useState({})
+
+  const dayCount = birthMonth ? daysInJalaliMonth(Number(birthMonth)) : 31
+
+  function handleMonthChange(value) {
+    setBirthMonth(value)
+    // Reset the day if it's no longer valid for the newly selected month
+    if (value && birthDay && Number(birthDay) > daysInJalaliMonth(Number(value))) {
+      setBirthDay('')
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -35,6 +52,14 @@ export default function ProfileForm({ initialData = {} }) {
     if (!name.trim()) {
       setFieldErrors({
         name: 'نام نمی‌تواند خالی باشد.',
+      })
+      return
+    }
+
+    if ((birthMonth === '') !== (birthDay === '')) {
+      setFieldErrors({
+        [birthMonth === '' ? 'birthMonth' : 'birthDay']:
+          'برای ثبت تاریخ تولد، هم ماه و هم روز باید مشخص شوند.',
       })
       return
     }
@@ -50,6 +75,9 @@ export default function ProfileForm({ initialData = {} }) {
         body: JSON.stringify({
           name: name.trim(),
           image: image.trim() || undefined,
+          bio: bio.trim(),
+          birthMonth: birthMonth === '' ? null : Number(birthMonth),
+          birthDay: birthDay === '' ? null : Number(birthDay),
         }),
       })
 
@@ -151,6 +179,71 @@ export default function ProfileForm({ initialData = {} }) {
 
         {fieldErrors.image && (
           <ErrorMessage message={fieldErrors.image} />
+        )}
+      </div>
+
+      {/* Bio */}
+      <div className="flex flex-col gap-1">
+        <label
+          htmlFor="profile-bio"
+          className="text-sm font-medium text-foreground"
+        >
+          بیوگرافی
+        </label>
+
+        <textarea
+          id="profile-bio"
+          value={bio}
+          onChange={(e) => setBio(e.target.value)}
+          placeholder="چند جمله درباره خودت بنویس..."
+          rows={3}
+          maxLength={300}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+        />
+
+        <p className="text-left text-xs text-muted-foreground" dir="ltr">
+          {bio.length}/300
+        </p>
+
+        {fieldErrors.bio && <ErrorMessage message={fieldErrors.bio} />}
+      </div>
+
+      {/* Birthday — Jalali (Shamsi) month/day only, no year */}
+      <div className="flex flex-col gap-1">
+        <label className="text-sm font-medium text-foreground">
+          تاریخ تولد شمسی (اختیاری، بدون سال)
+        </label>
+
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            value={birthMonth}
+            onChange={(e) => handleMonthChange(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+          >
+            <option value="">ماه</option>
+            {JALALI_MONTH_LABELS.map((label, index) => (
+              <option key={label} value={index + 1}>
+                {label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={birthDay}
+            onChange={(e) => setBirthDay(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/50"
+          >
+            <option value="">روز</option>
+            {Array.from({ length: dayCount }, (_, i) => i + 1).map((day) => (
+              <option key={day} value={day}>
+                {day}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {(fieldErrors.birthMonth || fieldErrors.birthDay) && (
+          <ErrorMessage message={fieldErrors.birthMonth ?? fieldErrors.birthDay} />
         )}
       </div>
 

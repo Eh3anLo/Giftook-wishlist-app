@@ -5,10 +5,12 @@ import { auth } from "@/lib/auth.js"
 import ProfileShareButton from "@/components/profile/ProfileShareButton"
 import { getUserById } from "@/services/user.service.js"
 import DeleteAccountButton from "@/components/common/DeleteAccountButton"
+import { formatJalaliBirthday } from "@/lib/jalaliMonths.js"
 
 /**
  * Authenticated profile page — only accessible to the signed-in user.
- * Shows name, avatar, email (self-only), and account management controls.
+ * Shows name, avatar, email (self-only), bio, birthday, and account
+ * management controls.
  */
 export const metadata = {
   title: "پروفایل من",
@@ -26,6 +28,7 @@ export default async function ProfilePage() {
   }
 
   const displayName = user.name ?? "کاربر"
+  const birthday = formatJalaliBirthday(user.birthMonth, user.birthDay)
 
   return (
     <main dir="rtl" className="min-h-screen bg-background px-4 py-10">
@@ -51,6 +54,9 @@ export default async function ProfilePage() {
             )}
           </div>
           <p className="text-xl font-semibold text-foreground">{displayName}</p>
+          {user.bio && (
+            <p className="max-w-sm text-center text-sm text-muted-foreground">{user.bio}</p>
+          )}
           <ProfileShareButton
             userId={user.id}
             userName={user.name ?? "کاربر"}
@@ -72,6 +78,13 @@ export default async function ProfilePage() {
               </dt>
               <dd className="text-base text-foreground">{user.email}</dd>
             </div>
+
+            {birthday && (
+              <div className="flex flex-col gap-1">
+                <dt className="text-sm font-medium text-muted-foreground">تاریخ تولد</dt>
+                <dd className="text-base text-foreground">{birthday}</dd>
+              </div>
+            )}
           </dl>
           <div className="mt-3 flex justify-end">
             <Link

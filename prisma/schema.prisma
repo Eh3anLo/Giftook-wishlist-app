@@ -13,6 +13,9 @@ model User {
   image         String?
   passwordHash  String?       @map("password_hash")
   emailVerified DateTime?     @map("email_verified")
+  bio           String?       @db.VarChar(300)
+  birthMonth    Int?          @map("birth_month")
+  birthDay      Int?          @map("birth_day")
   createdAt     DateTime      @default(now()) @map("created_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
   accounts      Account[]

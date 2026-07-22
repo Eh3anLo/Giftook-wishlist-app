@@ -14,6 +14,9 @@ export async function getUserById(id) {
       email: true,
       name: true,
       image: true,
+      bio: true,
+      birthMonth: true,
+      birthDay: true,
       emailVerified: true,
       createdAt: true,
       updatedAt: true,
@@ -67,15 +70,20 @@ export async function createUser({ email, name, passwordHash }) {
 }
 
 /**
- * Updates a user's display name or avatar URL.
+ * Updates a user's display name, avatar URL, bio, and/or birthday
+ * (month/day only — no year is ever stored).
  * @param {string} id
- * @param {{ name?: string, image?: string }} data
+ * @param {{ name?: string, image?: string, bio?: string,
+ *           birthMonth?: number|null, birthDay?: number|null }} data
  * @returns {Promise<object>}
  */
-export async function updateUser(id, { name, image }) {
+export async function updateUser(id, { name, image, bio, birthMonth, birthDay }) {
   const updateData = {}
   if (name !== undefined) updateData.name = name
   if (image !== undefined) updateData.image = image
+  if (bio !== undefined) updateData.bio = bio || null
+  if (birthMonth !== undefined) updateData.birthMonth = birthMonth === '' ? null : birthMonth
+  if (birthDay !== undefined) updateData.birthDay = birthDay === '' ? null : birthDay
 
   return prisma.user.update({
     where: { id },
@@ -85,6 +93,9 @@ export async function updateUser(id, { name, image }) {
       email: true,
       name: true,
       image: true,
+      bio: true,
+      birthMonth: true,
+      birthDay: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -92,7 +103,8 @@ export async function updateUser(id, { name, image }) {
 }
 
 /**
- * Returns the user's public-facing profile: name, image, and all public wishlists.
+ * Returns the user's public-facing profile: name, image, bio, birthday
+ * (month/day only), and all public wishlists.
  * Never returns email or passwordHash.
  * @param {string} userId
  * @returns {Promise<object|null>}
@@ -104,6 +116,9 @@ export async function getUserPublicProfile(userId) {
       id: true,
       name: true,
       image: true,
+      bio: true,
+      birthMonth: true,
+      birthDay: true,
       wishlists: {
         where: { visibility: 'public' },
         select: {

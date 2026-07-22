@@ -1,11 +1,12 @@
 import { auth, signOut } from '@/lib/auth.js'
 import { updateUser, deleteUser } from '@/services/user.service.js'
+import { validateProfileUpdate } from '@/lib/validations.js'
 import { handleServiceError } from '@/lib/api-helpers.js'
 
 /**
  * PATCH /api/users/me
- * Updates the authenticated user's name and/or avatar URL.
- * Never returns passwordHash.
+ * Updates the authenticated user's name, avatar URL, bio, and/or birthday
+ * (month/day only). Never returns passwordHash.
  */
 export async function PATCH(req) {
   try {
@@ -21,16 +22,19 @@ export async function PATCH(req) {
       return Response.json({ error: 'درخواست نامعتبر است.' }, { status: 400 })
     }
 
-    const { name, image } = body ?? {}
+    const { name, image, bio, birthMonth, birthDay } = body ?? {}
 
-    // Validate: if name is provided it must not be empty or whitespace-only
-    if (name !== undefined && String(name).trim() === '') {
-      return Response.json({ error: 'نام نمی‌تواند خالی باشد.', field: 'name' }, { status: 400 })
+    const validation = validateProfileUpdate({ name, image, bio, birthMonth, birthDay })
+    if (!validation.valid) {
+      return Response.json({ error: validation.error, field: validation.field }, { status: 400 })
     }
 
     const updated = await updateUser(session.user.id, {
       ...(name !== undefined ? { name: String(name).trim() } : {}),
       ...(image !== undefined ? { image } : {}),
+      ...(bio !== undefined ? { bio: typeof bio === 'string' ? bio.trim() : bio } : {}),
+      ...(birthMonth !== undefined ? { birthMonth: birthMonth === '' ? null : Number(birthMonth) } : {}),
+      ...(birthDay !== undefined ? { birthDay: birthDay === '' ? null : Number(birthDay) } : {}),
     })
 
     // Strip passwordHash just in case (updateUser already omits it, but be defensive)
