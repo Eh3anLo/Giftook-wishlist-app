@@ -133,3 +133,61 @@ export async function getFriends(userId) {
     orderBy: { name: 'asc' },
   })
 }
+
+// ---------------------------------------------------------------------------
+// getFollowers
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the list of users who follow userId, each flagged with whether
+ * userId follows them back (isFriend).
+ *
+ * @param {string} userId
+ * @returns {Promise<Array<{ id: string, name: string|null, image: string|null, isFriend: boolean }>>}
+ */
+export async function getFollowers(userId) {
+  const [followerRows, outgoing] = await Promise.all([
+    prisma.follow.findMany({
+      where: { followingId: userId },
+      include: { follower: { select: { id: true, name: true, image: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.follow.findMany({ where: { followerId: userId }, select: { followingId: true } }),
+  ])
+
+  const followingSet = new Set(outgoing.map((f) => f.followingId))
+
+  return followerRows.map((row) => ({
+    ...row.follower,
+    isFriend: followingSet.has(row.follower.id),
+  }))
+}
+
+// ---------------------------------------------------------------------------
+// getFollowing
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the list of users that userId follows, each flagged with whether
+ * they follow userId back (isFriend).
+ *
+ * @param {string} userId
+ * @returns {Promise<Array<{ id: string, name: string|null, image: string|null, isFriend: boolean }>>}
+ */
+export async function getFollowing(userId) {
+  const [followingRows, incoming] = await Promise.all([
+    prisma.follow.findMany({
+      where: { followerId: userId },
+      include: { following: { select: { id: true, name: true, image: true } } },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.follow.findMany({ where: { followingId: userId }, select: { followerId: true } }),
+  ])
+
+  const followerSet = new Set(incoming.map((f) => f.followerId))
+
+  return followingRows.map((row) => ({
+    ...row.following,
+    isFriend: followerSet.has(row.following.id),
+  }))
+}

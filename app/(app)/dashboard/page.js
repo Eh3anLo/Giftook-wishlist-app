@@ -3,15 +3,18 @@ import { redirect } from 'next/navigation'
 import { auth } from '@/lib/auth.js'
 import { getWishlistsByUser } from '@/services/wishlist.service.js'
 import { getUserStats } from '@/services/stats.service.js'
+import { getUpcomingFriendBirthdays } from '@/services/birthday.service.js'
 import WishlistGrid from '@/components/wishlist/WishlistGrid'
 import StatsOverview from '@/components/dashboard/StatsOverview'
+import UpcomingBirthdays from '@/components/dashboard/UpcomingBirthdays'
 
 /**
  * DashboardPage — Server Component.
  * Fetches the authenticated user's wishlists (paginated, 20 per page)
  * and renders them in a grid. Supports ?page=N and ?status=active|archived
  * URL params. Shows an empty state with a "ایجاد اولین لیست" CTA when no
- * active wishlists exist.
+ * active wishlists exist. Also shows friends' upcoming birthdays, soonest
+ * first, when the active/friends tab is shown.
  */
 export const metadata = {
   title: 'داشبورد',
@@ -30,9 +33,10 @@ export default async function DashboardPage({ searchParams }) {
   const page = Math.max(1, parseInt(resolvedParams?.page ?? '1', 10) || 1)
   const status = resolvedParams?.status === 'archived' ? 'archived' : 'active'
 
-  const [{ wishlists, total }, stats] = await Promise.all([
+  const [{ wishlists, total }, stats, upcomingBirthdays] = await Promise.all([
     getWishlistsByUser(session.user.id, { page, pageSize: PAGE_SIZE, status }),
     getUserStats(session.user.id),
+    status === 'active' ? getUpcomingFriendBirthdays(session.user.id, { withinDays: 30 }) : [],
   ])
 
   return (
@@ -48,6 +52,9 @@ export default async function DashboardPage({ searchParams }) {
           لیست جدید
         </Link>
       </div>
+
+      {/* Friends' upcoming birthdays — only on the active tab */}
+      {status === 'active' && <UpcomingBirthdays birthdays={upcomingBirthdays} />}
 
       {/* Stats overview — only on the active tab, only when there's at least one wishlist */}
       {status === 'active' && stats.wishlistCount > 0 && <StatsOverview stats={stats} />}

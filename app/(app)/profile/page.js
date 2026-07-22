@@ -4,13 +4,14 @@ import Image from "next/image"
 import { auth } from "@/lib/auth.js"
 import ProfileShareButton from "@/components/profile/ProfileShareButton"
 import { getUserById } from "@/services/user.service.js"
+import { getFollowInfo, getFriends } from "@/services/follow.service.js"
 import DeleteAccountButton from "@/components/common/DeleteAccountButton"
 import { formatJalaliBirthday } from "@/lib/jalaliMonths.js"
 
 /**
  * Authenticated profile page — only accessible to the signed-in user.
- * Shows name, avatar, email (self-only), bio, birthday, and account
- * management controls.
+ * Shows name, avatar, email (self-only), bio, birthday, follower/following/
+ * friend counts (linking to the full lists), and account management controls.
  */
 export const metadata = {
   title: "پروفایل من",
@@ -26,6 +27,11 @@ export default async function ProfilePage() {
   if (!user) {
     redirect("/login")
   }
+
+  const [followInfo, friends] = await Promise.all([
+    getFollowInfo(session.user.id, session.user.id),
+    getFriends(session.user.id),
+  ])
 
   const displayName = user.name ?? "کاربر"
   const birthday = formatJalaliBirthday(user.birthMonth, user.birthDay)
@@ -57,6 +63,20 @@ export default async function ProfilePage() {
           {user.bio && (
             <p className="max-w-sm text-center text-sm text-muted-foreground">{user.bio}</p>
           )}
+
+          {/* Follower / following / friend counts — link to the full lists */}
+          <div className="flex items-center gap-4 text-sm">
+            <Link href="/profile/connections?tab=followers" className="text-muted-foreground hover:underline">
+              <span className="font-medium text-foreground">{followInfo.followerCount}</span> دنبال‌کننده
+            </Link>
+            <Link href="/profile/connections?tab=following" className="text-muted-foreground hover:underline">
+              <span className="font-medium text-foreground">{followInfo.followingCount}</span> دنبال‌شونده
+            </Link>
+            <Link href="/profile/connections?tab=friends" className="text-muted-foreground hover:underline">
+              <span className="font-medium text-foreground">{friends.length}</span> دوست
+            </Link>
+          </div>
+
           <ProfileShareButton
             userId={user.id}
             userName={user.name ?? "کاربر"}
