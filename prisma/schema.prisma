@@ -134,6 +134,10 @@ model Reservation {
 
   message    String?  @db.VarChar(1000)
 
+  receiptImageUrl String? @map("receipt_image_url")
+  shippingAddress String? @map("shipping_address") @db.VarChar(500)
+  trackingCode    String? @map("tracking_code") @db.VarChar(100)
+
   createdAt  DateTime @default(now()) @map("created_at")
   giftItem   GiftItem @relation(fields: [giftItemId], references: [id], onDelete: Cascade)
   user       User?    @relation(fields: [userId], references: [id])

@@ -91,6 +91,10 @@ export default function OwnerReservationDialog({
     }
   }
 
+  const hasProof = Boolean(
+    reservation?.receiptImageUrl || reservation?.shippingAddress || reservation?.trackingCode
+  )
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="w-full max-w-md rounded-xl bg-card p-6 shadow-xl">
@@ -111,6 +115,32 @@ export default function OwnerReservationDialog({
               {reservation.message && (
                 <div className="mt-3 rounded-md border bg-background p-3 text-sm">
                   {reservation.message}
+                </div>
+              )}
+
+              {/* Purchase proof — read-only for the owner */}
+              {hasProof && (
+                <div className="mt-3 space-y-2 rounded-md border bg-background p-3 text-sm">
+                  <p className="text-xs font-medium text-muted-foreground">اطلاعات خرید</p>
+                  {reservation.receiptImageUrl && (<a
+                      href={reservation.receiptImageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block text-primary underline"
+                    >
+                      مشاهده تصویر رسید
+                    </a>
+                  )}
+                  {reservation.shippingAddress && (
+                    <p className="text-xs text-muted-foreground">
+                      آدرس ارسال: <span className="text-foreground">{reservation.shippingAddress}</span>
+                    </p>
+                  )}
+                  {reservation.trackingCode && (
+                    <p className="text-xs text-muted-foreground">
+                      کد رهگیری: <span className="text-foreground" dir="ltr">{reservation.trackingCode}</span>
+                    </p>
+                  )}
                 </div>
               )}
             </div>

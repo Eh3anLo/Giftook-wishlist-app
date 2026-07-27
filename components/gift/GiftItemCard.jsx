@@ -130,7 +130,7 @@ export default function GiftItemCard({
 
           {/* Description */}
           {item.description && (
-            <p className="mb-2 pt-1 line-clamp-2 text-sm text-muted-foreground flex flex-wrap items-center justify-center sm:justify-start">
+            <p className="mb-2 line-clamp-2 flex flex-wrap items-center justify-center pt-1 text-sm text-muted-foreground sm:justify-start">
               {item.description}
             </p>
           )}
@@ -240,7 +240,7 @@ export default function GiftItemCard({
             </div>
           )}
           {/* Reserve button — shown to authenticated non-owner visitors.
-              Also shown when the item is reserved by the current user so they can cancel. */}
+    Also shown when the item is reserved by the current user so they can cancel. */}
           {!isOwner && currentUserId && (
             <ReserveButton
               giftItemId={item.id}
@@ -248,6 +248,17 @@ export default function GiftItemCard({
               isReserved={item.isReserved ?? false}
               isOwnReservation={
                 item.isReserved && item.reservation?.userId === currentUserId
+              }
+              reservationProof={
+                item.isReserved && item.reservation?.userId === currentUserId
+                  ? {
+                      receiptImageUrl:
+                        item.reservation?.receiptImageUrl ?? null,
+                      shippingAddress:
+                        item.reservation?.shippingAddress ?? null,
+                      trackingCode: item.reservation?.trackingCode ?? null,
+                    }
+                  : null
               }
             />
           )}

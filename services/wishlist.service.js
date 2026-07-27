@@ -13,15 +13,6 @@ function buildArchivedFilter(status) {
 // createWishlist
 // ---------------------------------------------------------------------------
 
-/**
- * Creates a new wishlist for the given user.
- * Validates all fields before touching the database.
- *
- * @param {string} userId
- * @param {{ title: string, description?: string, coverImage?: string,
- *           occasion?: string, visibility?: string, showReserverIdentity?: boolean }} data
- * @returns {Promise<object>} Created wishlist record
- */
 export async function createWishlist(
   userId,
   {
@@ -64,16 +55,6 @@ export async function createWishlist(
 // getWishlistsByUser
 // ---------------------------------------------------------------------------
 
-/**
- * Returns a paginated list of wishlists owned by userId.
- * Each wishlist includes item and reservation counts.
- *
- * @param {string} userId
- * @param {{ page?: number, pageSize?: number, status?: 'active'|'archived'|'all' }} options
- *   status defaults to 'active' (archived: false). Pass 'archived' to see only
- *   archived lists, or 'all' to see everything regardless of archived state.
- * @returns {Promise<{ wishlists: object[], total: number }>}
- */
 export async function getWishlistsByUser(
   userId,
   { page = 1, pageSize = 10, status = "active" } = {}
@@ -93,7 +74,6 @@ export async function getWishlistsByUser(
             items: true,
           },
         },
-        // Include items with their reservations so we can compute reservedCount
         items: {
           select: {
             reservation: { select: { id: true } },
@@ -104,7 +84,6 @@ export async function getWishlistsByUser(
     prisma.wishlist.count({ where }),
   ])
 
-  // Compute reservedCount per wishlist and strip raw items array before returning
   const wishlistsWithCounts = wishlists.map(({ items, ...wishlist }) => ({
     ...wishlist,
     reservedCount: items.filter((item) => item.reservation !== null).length,
@@ -123,6 +102,9 @@ export async function getWishlistsByUser(
  * - Private wishlists are only visible to their owner (throws ForbiddenError otherwise).
  * - If requestingUserId === wishlist.userId AND showReserverIdentity === true,
  *   reserved items expose the reserver's { name, image }.
+ * - Purchase-proof fields (receiptImageUrl, shippingAddress, trackingCode)
+ *   are only exposed to the wishlist owner or the reservation's own maker —
+ *   NOT to every visitor, unlike message/guestName/guestEmail/guestPhone.
  * - In all other cases only isReserved: boolean is attached to each item.
  *
  * @param {string} wishlistId
@@ -164,6 +146,9 @@ export async function getWishlistById(wishlistId, requestingUserId) {
     const reserved = item.reservation !== null
 
     if (reserved) {
+      const isReservationOwner = item.reservation.userId === requestingUserId
+      const canSeeProof = isOwner || isReservationOwner
+
       return {
         ...item,
         price: item.price?.toString() ?? null,
@@ -187,6 +172,10 @@ export async function getWishlistById(wishlistId, requestingUserId) {
           guestPhone: item.reservation.guestPhone,
 
           message: item.reservation.message,
+
+          receiptImageUrl: canSeeProof ? item.reservation.receiptImageUrl : null,
+          shippingAddress: canSeeProof ? item.reservation.shippingAddress : null,
+          trackingCode: canSeeProof ? item.reservation.trackingCode : null,
 
           user: revealIdentity ? item.reservation.user : null,
         },
@@ -213,16 +202,6 @@ export async function getWishlistById(wishlistId, requestingUserId) {
 // getWishlistByShareToken
 // ---------------------------------------------------------------------------
 
-/**
- * Returns a wishlist looked up by its share token.
- * Returns null if the wishlist is private.
- * Reserver identities are NEVER exposed through this endpoint.
- * Archived wishlists are still returned here — archiving only affects the
- * owner's dashboard view, not an already-shared link.
- *
- * @param {string} shareToken
- * @returns {Promise<object|null>}
- */
 export async function getWishlistByShareToken(shareToken) {
   const wishlist = await prisma.wishlist.findUnique({
     where: { shareToken },
@@ -245,7 +224,6 @@ export async function getWishlistByShareToken(shareToken) {
   if (!wishlist) return null
   if (wishlist.visibility === "private") return null
 
-  // Strip all reserver identity data — only expose isReserved boolean
   const items = wishlist.items.map((item) => {
     return {
       ...item,
@@ -265,16 +243,6 @@ export async function getWishlistByShareToken(shareToken) {
 // updateWishlist
 // ---------------------------------------------------------------------------
 
-/**
- * Partially updates a wishlist. Only provided fields are changed.
- * Validates ownership and field constraints.
- *
- * @param {string} wishlistId
- * @param {string} userId          Requesting user (must be owner)
- * @param {{ title?: string, description?: string, coverImage?: string,
- *           occasion?: string, visibility?: string, showReserverIdentity?: boolean }} data
- * @returns {Promise<object>}
- */
 export async function updateWishlist(
   wishlistId,
   userId,
@@ -295,8 +263,6 @@ export async function updateWishlist(
     throw new ForbiddenError()
   }
 
-  // Validate only the fields that are being changed.
-  // We merge with existing values so validateWishlist sees a complete picture.
   const merged = {
     title: title !== undefined ? title : existing.title,
     description: description !== undefined ? description : existing.description,
@@ -310,7 +276,6 @@ export async function updateWishlist(
     throw new ValidationError(validation.error, validation.field)
   }
 
-  // Build update payload with only the explicitly provided fields
   const updateData = {}
   if (title !== undefined) updateData.title = title.trim()
   if (description !== undefined) updateData.description = description
@@ -330,14 +295,6 @@ export async function updateWishlist(
 // archiveWishlist / unarchiveWishlist
 // ---------------------------------------------------------------------------
 
-/**
- * Archives a wishlist (hides it from the default dashboard view).
- * Validates ownership before archiving.
- *
- * @param {string} wishlistId
- * @param {string} userId
- * @returns {Promise<object>} Updated wishlist record
- */
 export async function archiveWishlist(wishlistId, userId) {
   const existing = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
 
@@ -351,14 +308,6 @@ export async function archiveWishlist(wishlistId, userId) {
   })
 }
 
-/**
- * Restores a previously archived wishlist back to the active dashboard view.
- * Validates ownership before unarchiving.
- *
- * @param {string} wishlistId
- * @param {string} userId
- * @returns {Promise<object>} Updated wishlist record
- */
 export async function unarchiveWishlist(wishlistId, userId) {
   const existing = await prisma.wishlist.findUnique({ where: { id: wishlistId } })
 
@@ -376,14 +325,6 @@ export async function unarchiveWishlist(wishlistId, userId) {
 // deleteWishlist
 // ---------------------------------------------------------------------------
 
-/**
- * Deletes a wishlist and all its children (cascaded by Prisma / DB).
- * Validates ownership before deleting.
- *
- * @param {string} wishlistId
- * @param {string} userId
- * @returns {Promise<void>}
- */
 export async function deleteWishlist(wishlistId, userId) {
   const existing = await prisma.wishlist.findUnique({
     where: { id: wishlistId },
@@ -402,12 +343,6 @@ export async function deleteWishlist(wishlistId, userId) {
 // getWishlistProgress
 // ---------------------------------------------------------------------------
 
-/**
- * Returns the reservation progress for a wishlist.
- *
- * @param {string} wishlistId
- * @returns {Promise<{ total: number, reserved: number }>}
- */
 export async function getWishlistProgress(wishlistId) {
   const items = await prisma.giftItem.findMany({
     where: { wishlistId },

@@ -1,27 +1,34 @@
 "use client"
 
-import { useState , useEffect} from "react"
+import { useState, useEffect } from "react"
+import ReservationProofForm from "@/components/gift/ReservationProofForm"
 
 /**
  * ReserveButton — Client Component.
- * Handles reserve / cancel-reservation for a single gift item.
+ * Handles reserve / cancel-reservation for a single gift item. When the
+ * current user holds the reservation, also shows a toggleable form to
+ * attach purchase proof (receipt image URL, shipping address, tracking code).
  *
  * Props:
  *  - giftItemId (string): the gift item to reserve
  *  - reservationId (string|null): existing reservation id if the current user holds it
  *  - isReserved (bool): whether the item is already reserved by anyone
  *  - isOwnReservation (bool): whether the current user is the one who reserved it
+ *  - reservationProof (object|null): { receiptImageUrl, shippingAddress, trackingCode }
+ *      for the current user's own reservation, if any
  */
 export default function ReserveButton({
   giftItemId,
   reservationId,
   isReserved: initialReserved,
   isOwnReservation: initialIsOwn,
+  reservationProof = null,
 }) {
   const [isReserved, setIsReserved] = useState(initialReserved)
   const [isOwnReservation, setIsOwnReservation] = useState(initialIsOwn)
   const [currentReservationId, setCurrentReservationId] =
     useState(reservationId)
+  const [proof, setProof] = useState(reservationProof)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -140,6 +147,7 @@ export default function ReserveButton({
       setMessage("")
       setShowDialog(false)
       setError("")
+      setProof(null)
     } catch {
       // Network error — rollback
       setIsReserved(true)
@@ -167,16 +175,26 @@ export default function ReserveButton({
   }, [showDialog])
 
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col items-end gap-2">
       {isOwnReservation ? (
-        <button
-          type="button"
-          onClick={handleCancelReservation}
-          disabled={loading}
-          className="w-full rounded-md border border-destructive px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:outline-none disabled:opacity-60"
-        >
-          {loading ? "در حال لغو..." : "لغو رزرو"}
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={handleCancelReservation}
+            disabled={loading}
+            className="w-full rounded-md border border-destructive px-3 py-1.5 text-xs font-medium text-destructive transition-colors hover:bg-destructive/10 focus-visible:ring-2 focus-visible:ring-destructive/50 focus-visible:outline-none disabled:opacity-60"
+          >
+            {loading ? "در حال لغو..." : "لغو رزرو"}
+          </button>
+
+          {currentReservationId && (
+            <ReservationProofForm
+              reservationId={currentReservationId}
+              initialProof={proof}
+              onSaved={(updated) => setProof(updated)}
+            />
+          )}
+        </>
       ) : (
         <button
           type="button"

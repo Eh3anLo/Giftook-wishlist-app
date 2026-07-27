@@ -1,6 +1,7 @@
 import prisma from "@/lib/prisma.js"
 import { ForbiddenError, ConflictError, NotFoundError, ValidationError } from "@/lib/errors.js"
 import { notifyReservationCreated } from "@/services/notification.service.js"
+import { validateReservationProof } from "@/lib/validations.js"
 
 // ---------------------------------------------------------------------------
 // createReservation
@@ -14,6 +15,9 @@ import { notifyReservationCreated } from "@/services/notification.service.js"
  * - If the item is already reserved by someone else → ConflictError (409).
  * - If the item is already reserved by the same user → ConflictError (409, different message).
  * - The @unique constraint on giftItemId provides a DB-level race-condition guard.
+ *
+ * After creating, the wishlist owner is notified by email (best-effort,
+ * never blocks or fails the reservation itself).
  *
  * @param {string} giftItemId
  * @param {string} userId
@@ -90,34 +94,10 @@ export async function createReservation(
 
   return reservation
 }
+
 // ---------------------------------------------------------------------------
 // cancelReservation
 // ---------------------------------------------------------------------------
-
-// /**
-//  * Cancels (deletes) a reservation.
-//  * Only the user who made the reservation can cancel it.
-//  *
-//  * @param {string} reservationId
-//  * @param {string} userId
-//  * @returns {Promise<void>}
-//  */
-// export async function cancelReservation(reservationId, userId) {
-//   const reservation = await prisma.reservation.findUnique({
-//     where: { id: reservationId },
-//   })
-
-//   if (!reservation) {
-//     throw new NotFoundError()
-//   }
-
-//   if (reservation.userId !== userId) {
-//     throw new ForbiddenError()
-//   }
-
-//   await prisma.reservation.delete({ where: { id: reservationId } })
-// }
-
 
 /**
  * Cancels (deletes) a reservation.
@@ -131,7 +111,6 @@ export async function createReservation(
  * @returns {Promise<void>}
  */
 export async function cancelReservation(reservationId, userId) {
-  console.log("im here")
   const reservation = await prisma.reservation.findUnique({
     where: { id: reservationId },
     include: {
@@ -165,23 +144,61 @@ export async function cancelReservation(reservationId, userId) {
 }
 
 // ---------------------------------------------------------------------------
-// getReservationByItem
+// updateReservationProof
 // ---------------------------------------------------------------------------
 
 /**
- * Returns reservation status for a gift item.
+ * Adds or updates purchase-proof details (receipt image URL, shipping
+ * address, tracking code) on an existing reservation. Only the person who
+ * made the reservation may do this — not the wishlist owner, and not
+ * guest reservations (which have no associated account to authenticate as).
  *
- * @param {string} giftItemId
- * @param {string|null} requestingUserId
- * @param {boolean} showReserverIdentity  True when caller is the wishlist owner
- *   AND the wishlist has showReserverIdentity=true. When true, the reserver's
- *   { name, image } is included if the item is reserved.
- * @returns {Promise<{
- *   isReserved: boolean,
- *   isOwnReservation: boolean,
- *   reserver?: { name: string|null, image: string|null }
- * }>}
+ * @param {string} reservationId
+ * @param {string} userId
+ * @param {{ receiptImageUrl?: string|null, shippingAddress?: string|null, trackingCode?: string|null }} data
+ * @returns {Promise<object>} Updated reservation (id + proof fields only)
  */
+export async function updateReservationProof(
+  reservationId,
+  userId,
+  { receiptImageUrl, shippingAddress, trackingCode } = {}
+) {
+  const validation = validateReservationProof({ receiptImageUrl, shippingAddress, trackingCode })
+  if (!validation.valid) {
+    throw new ValidationError(validation.error, validation.field)
+  }
+
+  const reservation = await prisma.reservation.findUnique({ where: { id: reservationId } })
+
+  if (!reservation) {
+    throw new NotFoundError()
+  }
+
+  if (reservation.userId !== userId) {
+    throw new ForbiddenError()
+  }
+
+  const updateData = {}
+  if (receiptImageUrl !== undefined) updateData.receiptImageUrl = receiptImageUrl || null
+  if (shippingAddress !== undefined) updateData.shippingAddress = shippingAddress || null
+  if (trackingCode !== undefined) updateData.trackingCode = trackingCode || null
+
+  return prisma.reservation.update({
+    where: { id: reservationId },
+    data: updateData,
+    select: {
+      id: true,
+      giftItemId: true,
+      receiptImageUrl: true,
+      shippingAddress: true,
+      trackingCode: true,
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// getReservationByItem
+// ---------------------------------------------------------------------------
 
 /**
  * Returns reservation status for a gift item.
@@ -233,6 +250,11 @@ export async function getReservationByItem(
 
   const revealIdentity = showReserverIdentity && isWishlistOwner
 
+  // Purchase-proof fields (receipt/address/tracking) are only visible to
+  // the wishlist owner or the person who made the reservation — unlike
+  // the message field, these are NOT shown to every visitor.
+  const canSeeProof = isWishlistOwner || isOwnReservation
+
   const reservationType = reservation.user ? "user" : "guest"
 
   const result = {
@@ -240,6 +262,9 @@ export async function getReservationByItem(
     isOwnReservation,
     reservationType,
     message: reservation.message ?? null,
+    receiptImageUrl: canSeeProof ? reservation.receiptImageUrl : null,
+    shippingAddress: canSeeProof ? reservation.shippingAddress : null,
+    trackingCode: canSeeProof ? reservation.trackingCode : null,
   }
 
   // اگر نمایش هویت غیرفعال باشد
@@ -271,58 +296,6 @@ export async function getReservationByItem(
     },
   }
 }
-
-// export async function getReservationByItem(
-//   giftItemId,
-//   requestingUserId,
-//   showReserverIdentity
-// ) {
-//   const giftItem = await prisma.giftItem.findUnique({
-//     where: { id: giftItemId },
-//     include: {
-//       wishlist: true,
-//       reservation: {
-//         include: {
-//           user: {
-//             select: {
-//               id: true,
-//               name: true,
-//               image: true,
-//             },
-//           },
-//         },
-//       },
-//     },
-//   })
-
-//   if (!giftItem) {
-//     throw new NotFoundError()
-//   }
-
-//   const reservation = giftItem.reservation
-
-//   if (!reservation) {
-//     return { isReserved: false, isOwnReservation: false }
-//   }
-
-//   const isOwnReservation = reservation.userId === requestingUserId
-
-//   // Reserver identity is only revealed when:
-//   // - showReserverIdentity is explicitly true
-//   // - AND the requestingUserId is the wishlist owner
-//   const isWishlistOwner = requestingUserId === giftItem.wishlist.userId
-//   const revealIdentity = showReserverIdentity && isWishlistOwner
-
-//   if (revealIdentity) {
-//     return {
-//       isReserved: true,
-//       isOwnReservation,
-//       reserver: reservation.user ?? null,
-//     }
-//   }
-
-//   return { isReserved: true, isOwnReservation }
-// }
 
 /**
  * Creates a reservation by the wishlist owner.
