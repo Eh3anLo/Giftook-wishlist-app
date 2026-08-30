@@ -5,9 +5,9 @@
 ## 📸 پیش‌نمایش
 
 ### صفحه اصلی
-![home_page](./giftook_home.png)
+![home_page](./giftook_home.jpeg)
 ### داشبورد
-![home_page](./giftook_dashboard.png)
+![home_page](./giftook_dashboard.jpeg)
 
 ### پروفایل عمومی کاربر
 ![home_page](./giftook_profile_public.png)
